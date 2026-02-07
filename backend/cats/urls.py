@@ -3,6 +3,7 @@ from .views import (
     CatListCreateView,
     CatDetailView,
     CatImageUploadView,
+    CatVideoUploadView,
     MyCatsView
 )
 
@@ -13,9 +14,12 @@ urlpatterns = [
     # 詳細・更新・削除用
     path('<int:pk>/', CatDetailView.as_view(), name='cat-detail'),
     
-    # 画像アップロード（詳細の下位リソースとして定義）
+    # 画像アップロード
     path('<int:cat_id>/images/', CatImageUploadView.as_view(), name='cat-image-upload'),
     
-    # 自団体の猫一覧（管理用ショートカット）
+    # 動画アップロード
+    path('<int:cat_id>/videos/', CatVideoUploadView.as_view(), name='cat-video-upload'),
+    
+    # 自団体の猫一覧
     path('my_cats/', MyCatsView.as_view(), name='my-cats'),
 ]

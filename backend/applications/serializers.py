@@ -20,9 +20,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'id', 'cat', 'cat_detail', 'applicant_info',
             'status', 
             # 個人情報フィールドは除外
-            'motivation', 'created_at', 'updated_at'
+            'motivation', 'applied_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'applied_at', 'updated_at']
 
 
 class BaseApplicationDetailSerializer(ApplicationSerializer):

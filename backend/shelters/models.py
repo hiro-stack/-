@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
@@ -22,10 +23,16 @@ class Shelter(models.Model):
     address = models.TextField(
         verbose_name='住所'
     )
-    contact_info = models.CharField(
-        max_length=200,
-        verbose_name='連絡先',
-        help_text='電話番号またはメールアドレス'
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name='電話番号',
+        help_text='例: 03-1234-5678'
+    )
+    email = models.EmailField(
+        blank=True,
+        verbose_name='メールアドレス',
+        help_text='例: info@example.com'
     )
     registration_number = models.CharField(
         max_length=100,
@@ -49,6 +56,14 @@ class Shelter(models.Model):
         verbose_name = '保護団体'
         verbose_name_plural = '保護団体'
         ordering = ['name']
+    
+    def clean(self):
+        """電話番号またはメールアドレスの少なくとも一方が必須"""
+        super().clean()
+        if not self.phone and not self.email:
+            raise ValidationError(
+                '電話番号またはメールアドレスのどちらか一方は必須です。'
+            )
     
     def __str__(self):
         return self.name

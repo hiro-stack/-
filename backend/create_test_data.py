@@ -33,7 +33,7 @@ def create_test_data():
             representative='山田太郎',
             website_url='https://example.com',
             address='東京都渋谷区渋谷1-1-1',
-            contact_info='03-1234-5678',
+            phone='03-1234-5678',
             registration_number='NPO-12345',
             description='東京都内で保護猫活動を行っています。'
         )

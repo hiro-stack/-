@@ -12,7 +12,7 @@ class ShelterUserInline(admin.TabularInline):
 
 @admin.register(Shelter)
 class ShelterAdmin(admin.ModelAdmin):
-    list_display = ['name', 'representative', 'contact_info', 'created_at']
+    list_display = ['name', 'representative', 'phone', 'email', 'created_at']
     search_fields = ['name', 'representative', 'registration_number']
     inlines = [ShelterUserInline]
     readonly_fields = ['created_at', 'updated_at']

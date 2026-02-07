@@ -53,6 +53,8 @@ services:
     environment:
       - WATCHPACK_POLLING=true
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+    extra_hosts:
+      - "localhost:host-gateway"
     depends_on:
       - backend
 

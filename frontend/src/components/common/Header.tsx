@@ -1,0 +1,231 @@
+"use client";
+
+import Link from 'next/link';
+import { FC, useEffect, useState, useRef } from 'react';
+import Cookies from 'js-cookie';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
+import { User } from '@/types';
+
+const Header: FC = () => {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = Cookies.get('access_token');
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await api.get('/api/accounts/profile/');
+        setUser(response.data);
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+        // トークンが無効な場合はクリア
+        Cookies.remove('access_token');
+        Cookies.remove('refresh_token');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // ドロップダウン外をクリックしたら閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    Cookies.remove('access_token');
+    Cookies.remove('refresh_token');
+    setUser(null);
+    setIsDropdownOpen(false);
+    router.push('/');
+  };
+
+  const getUserTypeLabel = (userType: string) => {
+    switch (userType) {
+      case 'shelter': return '団体スタッフ';
+      case 'admin': return '管理者';
+      default: return '一般ユーザー';
+    }
+  };
+
+  const getUserTypeBadgeColor = (userType: string) => {
+    switch (userType) {
+      case 'shelter': return 'bg-blue-100 text-blue-600';
+      case 'admin': return 'bg-purple-100 text-purple-600';
+      default: return 'bg-pink-100 text-pink-600';
+    }
+  };
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md shadow-sm border-b border-pink-100 h-16">
+      <div className="container mx-auto px-4 h-full flex items-center justify-between">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 text-gray-800 hover:opacity-80 transition-opacity">
+            <span className="text-2xl">🐱</span>
+            <span className="font-bold text-lg tracking-wide">保護猫マッチング</span>
+          </Link>
+        </div>
+
+        {/* Center-Right: Navigation */}
+        <nav className="hidden md:flex items-center gap-6 ml-auto mr-8">
+          <Link 
+            href="/" 
+            className="text-gray-600 hover:text-pink-500 font-medium transition-colors"
+          >
+            保護猫を探す
+          </Link>
+          {user?.user_type === 'shelter' && (
+            <Link 
+              href="/shelter/dashboard" 
+              className="text-gray-600 hover:text-blue-500 font-medium transition-colors"
+            >
+              団体ダッシュボード
+            </Link>
+          )}
+        </nav>
+
+        {/* Right: User Actions */}
+        <div className="flex items-center gap-3">
+          {isLoading ? (
+            // ローディング中
+            <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse"></div>
+          ) : user ? (
+            // ログイン済み
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-pink-300 hover:bg-pink-50 transition-all"
+              >
+                {/* アバター */}
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium text-sm">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[100px] truncate">
+                  {user.username}
+                </span>
+                <svg 
+                  className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* ドロップダウンメニュー */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fadeIn">
+                  {/* ユーザー情報 */}
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium">
+                        {user.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-800 truncate">{user.username}</p>
+                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      </div>
+                    </div>
+                    <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${getUserTypeBadgeColor(user.user_type)}`}>
+                      {getUserTypeLabel(user.user_type)}
+                    </span>
+                  </div>
+
+                  {/* メニュー項目 */}
+                  <div className="py-1">
+                    <Link
+                      href="/profile"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="text-lg">👤</span>
+                      <span className="text-sm font-medium">プロフィール</span>
+                    </Link>
+                    
+                    <Link
+                      href="/profile/edit"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="text-lg">✏️</span>
+                      <span className="text-sm font-medium">プロフィール編集</span>
+                    </Link>
+
+                    <Link
+                      href="/applications"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="text-lg">📋</span>
+                      <span className="text-sm font-medium">申請履歴</span>
+                    </Link>
+
+                    {user.user_type === 'shelter' && (
+                      <Link
+                        href="/shelter/dashboard"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="text-lg">🏠</span>
+                        <span className="text-sm font-medium">団体ダッシュボード</span>
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* ログアウト */}
+                  <div className="pt-1 border-t border-gray-100">
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <span className="text-lg">🚪</span>
+                      <span className="text-sm font-medium">ログアウト</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // 未ログイン
+            <>
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-pink-500 border border-pink-500 rounded-full hover:bg-pink-50 transition-colors"
+              >
+                ログイン
+              </Link>
+              <Link
+                href="/signup"
+                className="px-4 py-2 text-sm font-medium text-white bg-pink-500 border border-pink-500 rounded-full hover:bg-pink-600 shadow-md hover:shadow-lg transition-all"
+              >
+                新規登録
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;

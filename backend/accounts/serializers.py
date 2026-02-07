@@ -5,6 +5,8 @@ from django.db import IntegrityError
 User = get_user_model()
 
 
+from shelters.models import ShelterUser
+
 class UserPrivateSerializer(serializers.ModelSerializer):
     """ユーザー詳細シリアライザー（管理者・本人・保護団体用）
     
@@ -16,14 +18,26 @@ class UserPrivateSerializer(serializers.ModelSerializer):
     更新には UserMeUpdateSerializer を推奨します。
     """
     
+    shelter_role = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'user_type', 'phone_number',
-            'address', 'profile_image', 'bio', 'created_at'
+            'address', 'profile_image', 'bio', 'created_at',
+            'shelter_role'
         ]
         # GET用として安全性を確保（万が一更新に使われても重要項目は不可）
         read_only_fields = ['id', 'username', 'email', 'user_type', 'created_at']
+
+    def get_shelter_role(self, obj):
+        if obj.user_type != 'shelter':
+            return None
+            
+        shelter_user = ShelterUser.objects.filter(user=obj, is_active=True).first()
+        if shelter_user:
+            return shelter_user.role
+        return None
 
 
 class UserMeUpdateSerializer(serializers.ModelSerializer):

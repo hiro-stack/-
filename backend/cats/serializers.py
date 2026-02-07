@@ -58,16 +58,25 @@ class CatListSerializer(serializers.ModelSerializer):
             return image_url
         return None
 
+class ShelterInfoSerializer(serializers.Serializer):
+    """保護団体情報シリアライザー（CatDetail用のネストされたシリアライザー）"""
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    address = serializers.CharField(read_only=True)
+    phone = serializers.CharField(read_only=True, allow_blank=True)
+    email = serializers.EmailField(read_only=True, allow_blank=True)
+
+
 class CatDetailSerializer(serializers.ModelSerializer):
     """保護猫詳細用シリアライザー"""
     
     images = CatImageSerializer(many=True, read_only=True)
     videos = CatVideoSerializer(many=True, read_only=True)
+    primary_image = serializers.SerializerMethodField()
     
-    # 修正: UserモデルではなくShelterモデルのnameフィールドを参照する
-    # models.py で shelter = ForeignKey(Shelter) となっているため
+    # 修正: Shelter情報をネストされたシリアライザーで返す
+    shelter = ShelterInfoSerializer(read_only=True)
     shelter_name = serializers.CharField(source='shelter.name', read_only=True)
-    shelter_id = serializers.IntegerField(source='shelter.id', read_only=True)
     
     class Meta:
         model = Cat
@@ -75,10 +84,19 @@ class CatDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'gender', 'age_years', 'age_months',
             'breed', 'size', 'color', 'personality', 'health_status',
             'vaccination', 'neutered', 'description', 'status',
-            'images', 'videos', 'shelter_id', 'shelter_name', 
+            'images', 'videos', 'primary_image', 'shelter', 'shelter_name', 
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_primary_image(self, obj):
+        image_url = obj.primary_image_url
+        if image_url:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
 
 class CatCreateUpdateSerializer(serializers.ModelSerializer):
     """保護猫作成・更新用シリアライザー"""

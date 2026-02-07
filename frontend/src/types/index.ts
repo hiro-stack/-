@@ -20,7 +20,12 @@ export interface User {
   username: string;
   email: string;
   user_type: 'adopter' | 'shelter' | 'admin';
-  profile_image?: string; 
+  phone_number?: string;
+  address?: string;
+  profile_image?: string;
+  bio?: string;
+  created_at?: string;
+  shelter_role?: 'admin' | 'staff' | 'volunteer';
 }
 
 export interface AuthResponse {
@@ -34,7 +39,7 @@ export interface AuthResponse {
 // Enums
 export type Gender = 'male' | 'female' | 'unknown';
 export type Size = 'small' | 'medium' | 'large';
-export type CatStatus = 'draft' | 'available' | 'negotiating' | 'trial' | 'transferred' | 'withdrawn';
+export type CatStatus = 'open' | 'in_review' | 'trial' | 'adopted' | 'paused';
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export interface CatImage {
@@ -62,9 +67,10 @@ export interface CatList {
   name: string;
   breed: string;
   gender: Gender;
-  age: number; // 歳
+  age_years: number;
+  age_months: number;
   status: CatStatus;
-  main_image_url: string | null;
+  primary_image: string | null;
   shelter_name: string;
   created_at: string;
 }

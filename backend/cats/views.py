@@ -1,9 +1,8 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.serializers import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q
-from rest_framework.exceptions import PermissionDenied
 from .models import Cat, CatImage, CatVideo
 from shelters.models import ShelterUser
 from .serializers import (
@@ -38,7 +37,10 @@ class IsShelterMemberOrReadOnly(permissions.BasePermission):
 class CatListCreateView(generics.ListCreateAPIView):
     """保護猫一覧・作成API"""
     
-    permission_classes = [IsShelterMemberOrReadOnly]
+    # create(POST) は IsAuthenticated が必要だが、List(GET) は AllowAny でも良い場合がある
+    # ここでは厳密に制御せず、セッション認証前提なら IsAuthenticatedOrReadOnly 的な動きになるよう調整
+    # ただし今回は IsShelterMemberOrReadOnly を使っているので、GETは誰でもOK、POSTはShelterのみとなる
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -68,32 +70,31 @@ class CatListCreateView(generics.ListCreateAPIView):
         max_age = self.request.query_params.get('max_age', None)
         
         if min_age is not None:
-             queryset = queryset.filter(age_years__gte=min_age)
+             try:
+                 queryset = queryset.filter(age_years__gte=int(min_age))
+             except ValueError:
+                 pass
         if max_age is not None:
-             queryset = queryset.filter(age_years__lte=max_age)
+             try:
+                 queryset = queryset.filter(age_years__lte=int(max_age))
+             except ValueError:
+                 pass
 
         # ステータスフィルター
         cat_status = self.request.query_params.get('status', None)
         
-        # 未認証ユーザー（一般公開）は status パラメータを無視し、'available' 固定
-        if not self.request.user.is_authenticated:
-            queryset = queryset.filter(status='available')
-        elif cat_status:
-            # 認証ユーザー（保護団体・管理者）のみステータス指定可能
+        if cat_status:
             queryset = queryset.filter(status=cat_status)
-        else:
-            # 認証ユーザーで指定なしの場合も、デフォルトは 'available' とする（安全側）
-            # もし管理画面等で全件出したい場合は ?status= などをフロントで制御するか、
-            # 別途「全件取得用」パラメータを用意するが、ここはシンプルに。
-            queryset = queryset.filter(status='available')
         
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):
         user = self.request.user
         
+        if not user.is_authenticated or user.user_type != 'shelter':
+            raise PermissionDenied("保護団体アカウントでログインしてください。")
+        
         # 所属する有効な保護団体を取得
-        # 1ユーザー1団体前提（adminロール優先等の要件があれば調整）
         shelter_user = ShelterUser.objects.filter(
             user=user, 
             is_active=True
@@ -109,13 +110,48 @@ class CatDetailView(generics.RetrieveUpdateDestroyAPIView):
     """保護猫詳細・更新・削除API"""
     
     queryset = Cat.objects.all()
-    # ShelterUser経由の権限チェックを適用
-    permission_classes = [IsShelterMemberOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
         if self.request.method in ['PUT', 'PATCH']:
             return CatCreateUpdateSerializer
         return CatDetailSerializer
+
+    def perform_update(self, serializer):
+        # 更新権限チェック
+        cat = self.get_object()
+        user = self.request.user
+        
+        if not user.is_authenticated or user.user_type != 'shelter':
+             raise PermissionDenied("編集権限がありません。")
+
+        is_member = ShelterUser.objects.filter(
+            user=user,
+            shelter=cat.shelter,
+            is_active=True
+        ).exists()
+        
+        if not is_member:
+            raise PermissionDenied("この猫を編集する権限がありません（所属団体が異なります）。")
+            
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # 削除権限チェック
+        user = self.request.user
+        if not user.is_authenticated or user.user_type != 'shelter':
+             raise PermissionDenied("削除権限がありません。")
+
+        is_member = ShelterUser.objects.filter(
+            user=user,
+            shelter=instance.shelter,
+            is_active=True
+        ).exists()
+        
+        if not is_member:
+            raise PermissionDenied("この猫を削除する権限がありません。")
+            
+        instance.delete()
 
 
 class CatImageUploadView(generics.CreateAPIView):
@@ -127,10 +163,9 @@ class CatImageUploadView(generics.CreateAPIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def create(self, request, *args, **kwargs):
-        cat_id = kwargs.get('cat_id')
+        cat_id = self.kwargs.get('cat_id')  # kwargsから取得するように修正
         user = request.user
         
-        # 権限チェック: この猫のShelterに所属しているか？
         try:
             cat = Cat.objects.get(id=cat_id)
         except Cat.DoesNotExist:
@@ -139,6 +174,7 @@ class CatImageUploadView(generics.CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        # 権限チェック
         is_member = False
         if user.user_type == 'shelter':
             is_member = ShelterUser.objects.filter(
@@ -149,6 +185,46 @@ class CatImageUploadView(generics.CreateAPIView):
         
         if not is_member:
             raise PermissionDenied('この猫の画像をアップロードする権限がありません')
+        
+        # serializerにデータを渡す際、catはsave時に渡すのでここではrequest.dataのみ
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(cat=cat)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CatVideoUploadView(generics.CreateAPIView):
+    """保護猫動画アップロードAPI"""
+    
+    queryset = CatVideo.objects.all()
+    serializer_class = CatVideoSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def create(self, request, *args, **kwargs):
+        cat_id = self.kwargs.get('cat_id')
+        user = request.user
+        
+        try:
+            cat = Cat.objects.get(id=cat_id)
+        except Cat.DoesNotExist:
+            return Response(
+                {'error': '保護猫が見つかりません'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 権限チェック
+        is_member = False
+        if user.user_type == 'shelter':
+            is_member = ShelterUser.objects.filter(
+                user=user,
+                shelter=cat.shelter,
+                is_active=True
+            ).exists()
+        
+        if not is_member:
+            raise PermissionDenied('この猫の動画をアップロードする権限がありません')
         
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -165,12 +241,18 @@ class MyCatsView(generics.ListAPIView):
     
     def get_queryset(self):
         user = self.request.user
+        
+        # スーパーユーザーは全件表示（デバッグ・管理者用）
+        if user.is_superuser:
+            return Cat.objects.all().order_by('-created_at')
+
         if user.user_type != 'shelter':
              return Cat.objects.none()
              
+        # ユーザーが所属する有効な団体IDリスト
         shelter_ids = ShelterUser.objects.filter(
             user=user,
             is_active=True
-        ).values_list('shelter_id', flat=True)
+        ).values_list('shelter', flat=True)
         
-        return Cat.objects.filter(shelter_id__in=shelter_ids).order_by('-created_at')
+        return Cat.objects.filter(shelter__in=shelter_ids).order_by('-created_at')

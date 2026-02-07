@@ -41,7 +41,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             # (cat__shelter_id ではなく shelter_id を直接見る)
             queryset = queryset | Application.objects.filter(shelter_id__in=shelter_ids)
             
-        return queryset.distinct().order_by('-created_at')
+        return queryset.distinct().order_by('-applied_at')
 
     def get_serializer_class(self):
         # 1. 作成時
