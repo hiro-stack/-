@@ -48,16 +48,28 @@ class CatListCreateView(generics.ListCreateAPIView):
         return CatListSerializer
     
     def get_queryset(self):
-        queryset = Cat.objects.all()
+        # select_related を使用してN+1問題を回避し、フィルター精度を向上
+        queryset = Cat.objects.select_related('shelter').all()
+
+        # 一般公開用一覧は、公開設定がONのもののみ
+        # (団体管理画面用覧 MyCatsView は別途存在し、そちらは全件表示する)
+        user = self.request.user
+        if not (user.is_authenticated and (user.user_type == 'shelter' or user.user_type == 'admin' or user.is_superuser)):
+            queryset = queryset.filter(is_public=True)
         
-        # 検索フィルター
+        # 検索フィルター (キーワード検索)
+        # 性格詳細、団体名、都道府県、市区町村も検索対象に含める
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) |
                 Q(breed__icontains=search) |
                 Q(color__icontains=search) |
-                Q(personality__icontains=search)
+                Q(personality__icontains=search) |
+                Q(description__icontains=search) |
+                Q(shelter__name__icontains=search) |
+                Q(shelter__prefecture__icontains=search) |
+                Q(shelter__city__icontains=search)
             )
 
         # フィルター: 性別
@@ -65,20 +77,20 @@ class CatListCreateView(generics.ListCreateAPIView):
         if gender:
              queryset = queryset.filter(gender=gender)
 
-        # フィルター: 年齢 (範囲指定)
-        min_age = self.request.query_params.get('min_age', None)
-        max_age = self.request.query_params.get('max_age', None)
-        
-        if min_age is not None:
-             try:
-                 queryset = queryset.filter(age_years__gte=int(min_age))
-             except ValueError:
-                 pass
-        if max_age is not None:
-             try:
-                 queryset = queryset.filter(age_years__lte=int(max_age))
-             except ValueError:
-                 pass
+        # フィルター: 年齢区分 (age_category)
+        age_category = self.request.query_params.get('age_category', None)
+        if age_category:
+            queryset = queryset.filter(age_category=age_category)
+
+        # フィルター: 都道府県 (shelter__prefecture) - dropdown用
+        prefecture = self.request.query_params.get('prefecture', None)
+        if prefecture:
+            queryset = queryset.filter(shelter__prefecture__icontains=prefecture)
+
+        # フィルター: 性格区分 (activity_level)
+        activity_level = self.request.query_params.get('activity_level', None)
+        if activity_level:
+            queryset = queryset.filter(activity_level=activity_level)
 
         # ステータスフィルター
         cat_status = self.request.query_params.get('status', None)

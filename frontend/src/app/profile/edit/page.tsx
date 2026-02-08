@@ -1,108 +1,98 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Cookies from "js-cookie";
-import api from "@/lib/api";
+import { authService } from "@/services/auth";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
-import { User } from "@/types";
-
-interface ProfileFormData {
-  phone_number: string;
-  address: string;
-  bio: string;
-}
+import { User, ApplicantProfile } from "@/types";
 
 export default function ProfileEditPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState<ProfileFormData>({
-    phone_number: "",
-    address: "",
-    bio: "",
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  
+  // プロフィールデータ
+  const [profile, setProfile] = useState<ApplicantProfile>({
+    age: null,
+    gender: null,
+    residence_area: "",
+    housing_type: null,
+    pet_allowed: null,
+    indoors_agreement: false,
+    absence_time: null,
+    home_frequency: null,
+    cat_experience: null,
+    cat_distance: null,
+    home_atmosphere: null,
+    visitor_frequency: null,
+    moving_plan: null,
+  });
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = Cookies.get("access_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
-        const response = await api.get("/api/accounts/profile/");
-        const userData = response.data;
-        setUser(userData);
-        setFormData({
-          phone_number: userData.phone_number || "",
-          address: userData.address || "",
-          bio: userData.bio || "",
-        });
-      } catch (error) {
-        console.error("Failed to fetch profile:", error);
-        router.push("/login");
+        const user = await authService.getProfile();
+        if (user.applicant_profile) {
+          setProfile(prev => ({ ...prev, ...user.applicant_profile }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+        setError("プロフィールの読み込みに失敗しました。");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProfile();
-  }, [router]);
+  }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors[name];
-      return newErrors;
-    });
-    setSuccessMessage("");
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+       const checked = (e.target as HTMLInputElement).checked;
+       setProfile(prev => ({ ...prev, [name]: checked }));
+    } else {
+       setProfile(prev => ({ ...prev, [name]: value === "" ? null : value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setErrors({});
-    setSuccessMessage("");
+    setError("");
+
+    // バリデーション (必須項目)
+    if (!profile.indoors_agreement) {
+      setError("完全室内飼いへの同意は必須です。");
+      setIsSaving(false);
+      return;
+    }
+    if (!profile.age) {
+        setError("年齢を入力してください。");
+        setIsSaving(false);
+        return;
+    }
 
     try {
-      const response = await api.patch("/api/accounts/profile/", formData);
-      setUser(response.data);
-      setSuccessMessage("プロフィールを更新しました！");
+      // UserMeUpdateSerializer に合わせて構造化
+      // applicant_profile フィールドにネストして送信
+      await authService.updateProfile({
+        applicant_profile: profile
+      } as any); // Type assertion needed because updateProfile expects User partial
       
-      // 3秒後にメッセージをクリア
-      setTimeout(() => setSuccessMessage(""), 3000);
+      // 成功したら猫一覧へ
+      router.push("/");
     } catch (err: any) {
       console.error("Update error:", err);
       if (err.response?.data) {
-        const data = err.response.data;
-        const fieldErrors: Record<string, string> = {};
-
-        Object.keys(data).forEach((key) => {
-          if (Array.isArray(data[key])) {
-            fieldErrors[key] = data[key][0];
-          } else if (typeof data[key] === "string") {
-            fieldErrors[key] = data[key];
-          }
-        });
-
-        if (Object.keys(fieldErrors).length > 0) {
-          setErrors(fieldErrors);
-        } else {
-          setErrors({ general: "更新に失敗しました。" });
-        }
+          // エラー処理（簡略化）
+          const msg = JSON.stringify(err.response.data);
+          setError(`保存に失敗しました: ${msg}`);
       } else {
-        setErrors({ general: "更新に失敗しました。しばらく経ってから再度お試しください。" });
+        setError("プロフィールの保存に失敗しました。");
       }
     } finally {
       setIsSaving(false);
@@ -111,17 +101,10 @@ export default function ProfileEditPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#fef9f3] via-[#ffeef3] to-[#f5f0f6] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">読み込み中...</p>
-        </div>
+      <div className="min-h-screen bg-[#fef9f3] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
@@ -129,200 +112,246 @@ export default function ProfileEditPage() {
       <Header />
 
       <main className="pt-24 pb-16 px-4">
-        <div className="max-w-2xl mx-auto">
-          {/* 戻るリンク */}
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-pink-500 mb-6 transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            プロフィールに戻る
-          </Link>
-
-          {/* 編集カード */}
+        <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-3xl shadow-xl p-8 border border-pink-100">
-            {/* ヘッダー */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-100 to-pink-200 rounded-full mb-4">
-                <span className="text-3xl">✏️</span>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                プロフィール編集
-              </h1>
-              <p className="text-gray-500 mt-2 text-sm">
-                あなたの情報を更新できます
+              <h1 className="text-2xl font-bold text-gray-800">プロフィール設定</h1>
+              <p className="text-gray-500 mt-2">
+                里親応募のために必要な情報を入力してください。<br/>
+                この情報は相性診断にも使用されます。
               </p>
             </div>
 
-            {/* 成功メッセージ */}
-            {successMessage && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl text-green-600 text-sm flex items-center gap-2">
-                <span className="text-lg">✅</span>
-                {successMessage}
-              </div>
-            )}
-
-            {/* エラーメッセージ */}
-            {errors.general && (
+            {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
-                {errors.general}
+                {error}
               </div>
             )}
 
-            {/* 固定情報 */}
-            <div className="mb-8 p-4 bg-gray-50 rounded-xl">
-              <h3 className="text-sm font-medium text-gray-500 mb-3">
-                アカウント情報（変更不可）
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-400">ユーザー名:</span>
-                  <span className="ml-2 text-gray-700 font-medium">
-                    {user.username}
-                  </span>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              
+              {/* A. 初期登録（必須・マッチング基盤） */}
+              <section>
+                <h2 className="text-lg font-bold text-pink-600 border-b border-pink-100 pb-2 mb-4">基本情報</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">年齢 <span className="text-red-500">*</span></label>
+                    <input
+                      required
+                      type="number"
+                      name="age"
+                      value={profile.age || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">性別</label>
+                    <select
+                      name="gender"
+                      value={profile.gender || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="male">男性</option>
+                      <option value="female">女性</option>
+                      <option value="other">その他</option>
+                      <option value="no_answer">回答しない</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">※団体提出用（マッチングスコアには使用しません）</p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">居住エリア（都道府県 / 市区町村） <span className="text-red-500">*</span></label>
+                    <input
+                      required
+                      type="text"
+                      name="residence_area"
+                      value={profile.residence_area || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                      placeholder="例：東京都渋谷区"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">住宅形態</label>
+                    <select
+                      name="housing_type"
+                      value={profile.housing_type || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="owned">持ち家</option>
+                      <option value="rented">賃貸</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ペット可否</label>
+                    <select
+                      name="pet_allowed"
+                      value={profile.pet_allowed || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="allowed">可（契約書あり）</option>
+                      <option value="planned">確認予定</option>
+                      <option value="not_allowed">不可</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-400">メールアドレス:</span>
-                  <span className="ml-2 text-gray-700 font-medium">
-                    {user.email}
-                  </span>
+
+                <div className="mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer p-4 bg-pink-50 rounded-xl border border-pink-100">
+                    <input
+                      type="checkbox"
+                      name="indoors_agreement"
+                      checked={profile.indoors_agreement || false}
+                      onChange={handleChange}
+                      className="w-5 h-5 text-pink-500 rounded focus:ring-pink-500"
+                    />
+                    <span className="text-gray-800 font-medium">完全室内飼いに同意します（必須）</span>
+                  </label>
                 </div>
-              </div>
-            </div>
+              </section>
 
-            {/* 編集フォーム */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* 電話番号 */}
-              <div>
-                <label
-                  htmlFor="phone_number"
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  電話番号
-                </label>
-                <input
-                  type="tel"
-                  id="phone_number"
-                  name="phone_number"
-                  value={formData.phone_number}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.phone_number
-                      ? "border-red-300 bg-red-50"
-                      : "border-gray-200"
-                  } focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none transition-all`}
-                  placeholder="090-1234-5678"
-                />
-                {errors.phone_number && (
-                  <p className="mt-1.5 text-sm text-red-500">
-                    {errors.phone_number}
-                  </p>
-                )}
-              </div>
+              <section>
+                <h2 className="text-lg font-bold text-pink-600 border-b border-pink-100 pb-2 mb-4">生活リズム</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">平均留守時間</label>
+                    <select
+                      name="absence_time"
+                      value={profile.absence_time || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="less_than_4">4時間未満</option>
+                      <option value="4_to_8">4〜8時間</option>
+                      <option value="8_to_12">8〜12時間</option>
+                      <option value="more_than_12">12時間以上</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">在宅頻度</label>
+                    <select
+                      name="home_frequency"
+                      value={profile.home_frequency || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="high">高い（ほぼ毎日）</option>
+                      <option value="medium">普通（週2-3日在宅）</option>
+                      <option value="low">低い（ほぼ不在）</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
 
-              {/* 住所 */}
-              <div>
-                <label
-                  htmlFor="address"
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  住所
-                </label>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.address
-                      ? "border-red-300 bg-red-50"
-                      : "border-gray-200"
-                  } focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none transition-all`}
-                  placeholder="東京都渋谷区..."
-                />
-                {errors.address && (
-                  <p className="mt-1.5 text-sm text-red-500">{errors.address}</p>
-                )}
-              </div>
+              {/* B. プロフィール（相性推定用・強く推奨） */}
+              <section>
+                <h2 className="text-lg font-bold text-pink-600 border-b border-pink-100 pb-2 mb-4">
+                  相性・ライフスタイル <span className="text-sm font-normal text-gray-500 ml-2">※マッチング精度向上のため入力推奨</span>
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">猫の飼育経験</label>
+                    <select
+                      name="cat_experience"
+                      value={profile.cat_experience || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="none">なし</option>
+                      <option value="one">あり</option>
+                      <option value="multiple">複数経験あり</option>
+                    </select>
+                  </div>
 
-              {/* 自己紹介 */}
-              <div>
-                <label
-                  htmlFor="bio"
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  自己紹介
-                </label>
-                <textarea
-                  id="bio"
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleChange}
-                  rows={5}
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.bio ? "border-red-300 bg-red-50" : "border-gray-200"
-                  } focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none transition-all resize-none`}
-                  placeholder="猫との暮らしへの想いや、飼育経験などを書いてください..."
-                />
-                {errors.bio && (
-                  <p className="mt-1.5 text-sm text-red-500">{errors.bio}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-400">
-                  里親申請時に団体に公開されます
-                </p>
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">猫との希望距離感</label>
+                    <select
+                      name="cat_distance"
+                      value={profile.cat_distance || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="clingy">べったり甘えてほしい</option>
+                      <option value="moderate">適度な距離感がいい</option>
+                      <option value="watchful">静かに見守りたい</option>
+                    </select>
+                  </div>
 
-              {/* ボタン */}
-              <div className="flex gap-4 pt-4">
-                <Link
-                  href="/profile"
-                  className="flex-1 py-3.5 text-center border-2 border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  キャンセル
-                </Link>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">家の雰囲気</label>
+                    <select
+                      name="home_atmosphere"
+                      value={profile.home_atmosphere || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="quiet">静か</option>
+                      <option value="normal">普通</option>
+                      <option value="lively">にぎやか</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">来客頻度</label>
+                    <select
+                      name="visitor_frequency"
+                      value={profile.visitor_frequency || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="high">多い</option>
+                      <option value="medium">普通</option>
+                      <option value="low">少ない</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">引っ越し予定</label>
+                    <select
+                      name="moving_plan"
+                      value={profile.moving_plan || ""}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-100 outline-none"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="none">なし</option>
+                      <option value="within_1_2_years">1–2年以内</option>
+                      <option value="undecided">未定</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <div className="pt-6 border-t border-gray-200">
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-pink-500 to-pink-400 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:from-pink-600 hover:to-pink-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-4 bg-gradient-to-r from-pink-500 to-pink-400 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl hover:from-pink-600 hover:to-pink-500 transition-all disabled:opacity-60"
                 >
-                  {isSaving ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      保存中...
-                    </span>
-                  ) : (
-                    "保存する"
-                  )}
+                  {isSaving ? "保存中..." : "プロフィールを保存して次へ"}
                 </button>
               </div>
+
             </form>
           </div>
         </div>

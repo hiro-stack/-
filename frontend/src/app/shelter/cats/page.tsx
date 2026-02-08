@@ -14,6 +14,7 @@ export default function ShelterCatsPage() {
   const [cats, setCats] = useState<CatList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isSuperUser, setIsSuperUser] = useState(false);
 
   useEffect(() => {
     const fetchMyCats = async () => {
@@ -24,14 +25,18 @@ export default function ShelterCatsPage() {
       }
 
       try {
+        // プロフィール情報を取得して権限を確認
+        const userResponse = await api.get("/api/accounts/profile/");
+        setIsSuperUser(userResponse.data.is_superuser || userResponse.data.shelter_role === 'admin');
+
         const response = await api.get("/api/cats/my_cats/");
         setCats(response.data.results || response.data);
       } catch (err: any) {
-        console.error("Failed to fetch cats:", err);
+        console.error("Failed to fetch data:", err);
         if (err.response?.status === 401 || err.response?.status === 403) {
           router.push("/shelter/login");
         } else {
-          setError("猫の情報を取得できませんでした。");
+          setError("情報の取得に失敗しました。");
         }
       } finally {
         setIsLoading(false);
@@ -89,13 +94,15 @@ export default function ShelterCatsPage() {
               <h1 className="text-2xl font-bold text-gray-800">猫の管理</h1>
               <p className="text-gray-500 mt-1">登録済みの保護猫を管理します</p>
             </div>
-            <Link
-              href="/shelter/cats/new"
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-            >
-              <span>➕</span>
-              新しい猫を登録
-            </Link>
+            {isSuperUser && (
+              <Link
+                href="/shelter/cats/new"
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+              >
+                <span>➕</span>
+                新しい猫を登録
+              </Link>
+            )}
           </div>
 
           {/* エラー表示 */}
@@ -124,17 +131,18 @@ export default function ShelterCatsPage() {
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         登録日
                       </th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        操作
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {cats.map((cat) => (
-                      <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
+                      <tr 
+                        key={cat.id} 
+                        onClick={() => router.push(`/shelter/cats/${cat.id}/edit`)}
+                        className="hover:bg-blue-50 transition-colors cursor-pointer group"
+                      >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 group-hover:scale-105 transition-transform">
                               {cat.primary_image ? (
                                 <img
                                   src={cat.primary_image}
@@ -148,7 +156,7 @@ export default function ShelterCatsPage() {
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-800">{cat.name}</p>
+                              <p className="font-medium text-gray-800 group-hover:text-blue-600 transition-colors">{cat.name}</p>
                               <p className="text-sm text-gray-500">{cat.breed || "MIX"}</p>
                             </div>
                           </div>
@@ -158,28 +166,12 @@ export default function ShelterCatsPage() {
                             {cat.gender === "male" ? "♂ オス" : cat.gender === "female" ? "♀ メス" : "不明"}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {cat.age_years}歳{cat.age_months > 0 && `${cat.age_months}ヶ月`}
+                            {cat.estimated_age || cat.age_category || "不明"}
                           </p>
                         </td>
                         <td className="px-6 py-4">{getStatusBadge(cat.status)}</td>
                         <td className="px-6 py-4 text-gray-500 text-sm">
                           {new Date(cat.created_at).toLocaleDateString("ja-JP")}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Link
-                              href={`/cats/${cat.id}`}
-                              className="px-3 py-1.5 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            >
-                              詳細
-                            </Link>
-                            <Link
-                              href={`/shelter/cats/${cat.id}/edit`}
-                              className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
-                            >
-                              編集
-                            </Link>
-                          </div>
                         </td>
                       </tr>
                     ))}
@@ -194,13 +186,19 @@ export default function ShelterCatsPage() {
               <p className="text-gray-500 mb-6">
                 新しい保護猫を登録して、里親を募集しましょう
               </p>
-              <Link
-                href="/shelter/cats/new"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all"
-              >
-                <span>➕</span>
-                最初の猫を登録する
-              </Link>
+              {isSuperUser ? (
+                <Link
+                  href="/shelter/cats/new"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all"
+                >
+                  <span>➕</span>
+                  最初の猫を登録する
+                </Link>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  ※新しい猫の登録は管理人のみ可能です
+                </p>
+              )}
             </div>
           )}
         </div>

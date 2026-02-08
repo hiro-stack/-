@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Cookies from "js-cookie";
 import api from "@/lib/api";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import { User } from "@/types";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
+
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -38,13 +42,21 @@ export default function LoginPage() {
       Cookies.set("refresh_token", refresh, { expires: 7, secure: isSecure, sameSite: "Lax" });
 
       // ユーザー情報を取得してリダイレクト先を決定
-      const userResponse = await api.get("/api/accounts/profile/");
+      const userResponse = await api.get<User>("/api/accounts/profile/");
       const user = userResponse.data;
 
       if (user.user_type === "shelter") {
         router.push("/shelter/dashboard");
       } else {
-        router.push("/");
+        // 里親（adopter）の場合、プロフィール入力完了チェック
+        const profile = user.applicant_profile;
+        const isProfileComplete = profile && profile.age && profile.indoors_agreement; // 最低限の必須項目チェック
+
+        if (!isProfileComplete) {
+          router.push("/profile/edit");
+        } else {
+          router.push(redirect);
+        }
       }
     } catch (err: any) {
       console.error("Login error:", err);

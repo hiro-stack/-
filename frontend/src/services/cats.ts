@@ -9,8 +9,9 @@ export const catsService = {
       if (filters.search) params.append('search', filters.search);
       if (filters.gender) params.append('gender', filters.gender);
       if (filters.status) params.append('status', filters.status);
-      if (filters.min_age !== undefined) params.append('min_age', String(filters.min_age));
-      if (filters.max_age !== undefined) params.append('max_age', String(filters.max_age));
+      if (filters.age_category) params.append('age_category', filters.age_category);
+      if (filters.prefecture) params.append('prefecture', filters.prefecture);
+      if (filters.activity_level) params.append('activity_level', filters.activity_level);
       // Backendのページング仕様に合わせる
       if (filters.page) params.append('page', String(filters.page));
     }

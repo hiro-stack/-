@@ -54,36 +54,46 @@ export default function ShelterDashboardPage() {
 
         setUser(userData);
 
-        // 統計データ取得（エラーがあっても続行）
+        // 統計データ取得（個別に取得して耐障害性を高める）
         try {
-          // 猫の情報は全スタッフが取得
           const catsPromise = api.get("/api/cats/my_cats/", { params: { limit: 1000 } });
-          
-          // 申請情報は管理者の場合のみ取得
-          let applicationsPromise = Promise.resolve({ data: { results: [], count: 0 } });
-          if (userData.shelter_role === 'admin') {
-            applicationsPromise = api.get("/api/applications/applications/", { params: { limit: 1000 } });
-          }
+          const applicationsPromise = (userData.shelter_role === 'admin' || userData.is_superuser)
+            ? api.get("/api/applications/", { params: { limit: 1000 } })
+            : Promise.resolve({ data: { results: [], count: 0 } });
 
-          const [catsResponse, applicationsResponse] = await Promise.all([
+          const [catsResult, appsResult] = await Promise.allSettled([
             catsPromise,
             applicationsPromise,
           ]);
 
-          const cats: CatList[] = catsResponse.data.results || catsResponse.data;
-          // 型安全のためにanyキャストを使用
-          const applicationsData: any = applicationsResponse.data;
-          const applications: Application[] = applicationsData.results || applicationsData;
+          let catStats = { total: 0, open: 0, adopted: 0 };
+          if (catsResult.status === 'fulfilled') {
+            const cats = catsResult.value.data.results || catsResult.value.data;
+            catStats = {
+              total: catsResult.value.data.count || cats.length,
+              open: cats.filter((c: any) => c.status === "open").length,
+              adopted: cats.filter((c: any) => c.status === "adopted").length,
+            };
+          }
+
+          let appStats = { total: 0, pending: 0 };
+          if (appsResult.status === 'fulfilled') {
+            const apps = appsResult.value.data.results || appsResult.value.data;
+            appStats = {
+              total: appsResult.value.data.count || apps.length,
+              pending: apps.filter((a: any) => a.status === "pending").length,
+            };
+          }
 
           setStats({
-            totalCats: catsResponse.data.count || cats.length,
-            openCats: cats.filter((c) => c.status === "open").length,
-            adoptedCats: cats.filter((c) => c.status === "adopted").length,
-            totalApplications: applicationsData.count || applications.length,
-            pendingApplications: applications.filter((a) => a.status === "pending").length,
+            totalCats: catStats.total,
+            openCats: catStats.open,
+            adoptedCats: catStats.adopted,
+            totalApplications: appStats.total,
+            pendingApplications: appStats.pending,
           });
         } catch (statsError) {
-          console.error("Stats fetch failed:", statsError);
+          console.error("Stats calculation failed:", statsError);
         }
       } catch (error: any) {
         console.error("Auth check failed:", error);
@@ -115,8 +125,8 @@ export default function ShelterDashboardPage() {
     );
   }
 
-  // 管理者権限チェック
-  const isAdmin = user?.shelter_role === 'admin';
+  // 管理者権限チェック (is_superuser または shelter_role が admin)
+  const isAdmin = user?.is_superuser || user?.shelter_role === 'admin';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f5f0f6] via-[#e8f4f8] to-[#f0f5ff] font-sans text-gray-900">
@@ -142,7 +152,7 @@ export default function ShelterDashboardPage() {
                   保護団体ダッシュボードへようこそ。
                   {isAdmin 
                     ? "ここから猫の登録や申請の管理（管理者機能）ができます。" 
-                    : "猫の登録や情報の管理を行えます。"}
+                    : "登録済みの猫の情報の管理を行えます。"}
                 </p>
               </div>
               <button
@@ -154,16 +164,69 @@ export default function ShelterDashboardPage() {
             </div>
           </div>
 
+          {/* 審査ステータスバナー */}
+          {user?.shelter_info && user.shelter_info.verification_status !== 'approved' && (
+            <div className={`mb-8 p-6 rounded-2xl border ${
+              user.shelter_info.verification_status === 'pending'
+                ? 'bg-blue-50 border-blue-100 text-blue-800'
+                : user.shelter_info.verification_status === 'need_fix'
+                ? 'bg-orange-50 border-orange-100 text-orange-800'
+                : 'bg-red-50 border-red-100 text-red-800'
+            }`}>
+              <div className="flex items-start gap-4">
+                <div className="text-2xl">
+                  {user.shelter_info.verification_status === 'pending' ? '⏳' : '⚠️'}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold mb-1">
+                    {user.shelter_info.verification_status === 'pending' && '団体情報の審査中です'}
+                    {user.shelter_info.verification_status === 'need_fix' && '団体情報の修正が必要です'}
+                    {user.shelter_info.verification_status === 'rejected' && '団体登録が承認されませんでした'}
+                  </h3>
+                  <div className="text-sm opacity-90">
+                    {user.shelter_info.verification_status === 'pending' && (
+                      <p>
+                        現在運営による内容確認を行っております。承認されるまで、猫の公開や応募の受付はできません。<br />
+                        審査完了まで今しばらくお待ちください。
+                      </p>
+                    )}
+                    {user.shelter_info.verification_status === 'need_fix' && (
+                      <div className="space-y-2">
+                        <p>運営より以下の内容について修正依頼が出ています：</p>
+                        {user.shelter_info.review_message && (
+                          <div className="p-3 bg-white/50 rounded-lg font-medium">
+                            {user.shelter_info.review_message}
+                          </div>
+                        )}
+                        <Link 
+                          href="/shelter/profile"
+                          className="inline-block mt-2 px-4 py-2 bg-orange-500 text-white rounded-lg font-bold text-xs"
+                        >
+                          プロフィールを修正する
+                        </Link>
+                      </div>
+                    )}
+                    {user.shelter_info.verification_status === 'rejected' && (
+                      <p>恐れ入りますが、ご登録の内容では承認することができませんでした。詳細はメールまたは運営までお問い合わせください。</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* クイックアクション */}
           <div className={`grid grid-cols-1 md:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-6 mb-8`}>
-            <Link
-              href="/shelter/cats/new"
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group"
-            >
-              <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">🐱</div>
-              <h3 className="font-semibold text-gray-800 mb-1">新しい猫を登録</h3>
-              <p className="text-sm text-gray-500">保護猫の情報を追加</p>
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/shelter/cats/new"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group"
+              >
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">🐱</div>
+                <h3 className="font-semibold text-gray-800 mb-1">新しい猫を登録</h3>
+                <p className="text-sm text-gray-500">保護猫の情報を追加</p>
+              </Link>
+            )}
 
             <Link
               href="/shelter/cats"
@@ -175,31 +238,31 @@ export default function ShelterDashboardPage() {
             </Link>
 
             {isAdmin && (
-              <>
-                <Link
-                  href="/shelter/applications"
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group relative"
-                >
-                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">📨</div>
-                  <h3 className="font-semibold text-gray-800 mb-1">申請一覧</h3>
-                  <p className="text-sm text-gray-500">里親申請を確認</p>
-                  {stats.pendingApplications > 0 && (
-                    <span className="absolute top-4 right-4 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
-                      {stats.pendingApplications}
-                    </span>
-                  )}
-                </Link>
-
-                <Link
-                  href="/shelter/messages"
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group"
-                >
-                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">💬</div>
-                  <h3 className="font-semibold text-gray-800 mb-1">メッセージ</h3>
-                  <p className="text-sm text-gray-500">申請者とやり取り</p>
-                </Link>
-              </>
+              <Link
+                href="/shelter/applications"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group relative"
+              >
+                <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">📨</div>
+                <h3 className="font-semibold text-gray-800 mb-1">申請一覧</h3>
+                <p className="text-sm text-gray-500">里親申請を確認</p>
+                {stats.pendingApplications > 0 && (
+                  <span className="absolute top-4 right-4 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                    {stats.pendingApplications}
+                  </span>
+                )}
+              </Link>
             )}
+
+            <Link
+              href="/shelter/profile"
+              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group"
+            >
+              <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">🏢</div>
+              <h3 className="font-semibold text-gray-800 mb-1">団体プロフィール</h3>
+              <p className="text-sm text-gray-500">
+                {isAdmin ? "団体の情報を編集・管理" : "団体の情報を確認"}
+              </p>
+            </Link>
           </div>
 
           {/* 統計カード */}
@@ -259,8 +322,8 @@ export default function ShelterDashboardPage() {
             </div>
           )}
 
-          {/* クイックスタートガイド */}
-          {stats.totalCats === 0 && (
+          {/* クイックスタートガイド (管理人のみ) */}
+          {isAdmin && stats.totalCats === 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
               <div className="flex items-start gap-4">
                 <span className="text-2xl">🎉</span>

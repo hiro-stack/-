@@ -6,13 +6,26 @@ import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { User } from '@/types';
+import { ClipboardList, Bell } from 'lucide-react';
 
 const Header: FC = () => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [totalUnread, setTotalUnread] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.get("/api/applications/");
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      const unread = data.reduce((acc: number, app: any) => acc + (app.unread_count || 0), 0);
+      setTotalUnread(unread);
+    } catch (err) {
+      console.error("Failed to fetch unread count:", err);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -25,9 +38,14 @@ const Header: FC = () => {
       try {
         const response = await api.get('/api/accounts/profile/');
         setUser(response.data);
+        // 初回取得
+        fetchUnreadCount();
+        
+        // ポーリング (30秒ごと)
+        const interval = setInterval(fetchUnreadCount, 30000);
+        return () => clearInterval(interval);
       } catch (error) {
         console.error('Failed to fetch user:', error);
-        // トークンが無効な場合はクリア
         Cookies.remove('access_token');
         Cookies.remove('refresh_token');
       } finally {
@@ -86,7 +104,7 @@ const Header: FC = () => {
         </div>
 
         {/* Center-Right: Navigation */}
-        <nav className="hidden md:flex items-center gap-6 ml-auto mr-8">
+        <nav className="hidden md:flex items-center gap-6 ml-auto mr-4">
           <Link 
             href="/" 
             className="text-gray-600 hover:text-pink-500 font-medium transition-colors"
@@ -101,112 +119,144 @@ const Header: FC = () => {
               団体ダッシュボード
             </Link>
           )}
+          {user?.is_superuser && (
+            <Link 
+              href="/admin/shelters" 
+              className="text-purple-600 hover:text-purple-800 font-bold transition-colors"
+            >
+              👑 運営管理
+            </Link>
+          )}
         </nav>
 
         {/* Right: User Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {isLoading ? (
-            // ローディング中
             <div className="w-10 h-10 rounded-full bg-gray-100 animate-pulse"></div>
           ) : user ? (
-            // ログイン済み
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-pink-300 hover:bg-pink-50 transition-all"
-              >
-                {/* アバター */}
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium text-sm">
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[100px] truncate">
-                  {user.username}
-                </span>
-                <svg 
-                  className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
+            <>
+              {/* 申請履歴ボタン (通知付き) - 一般ユーザーのみ表示 */}
+              {user.user_type !== 'shelter' && user.user_type !== 'admin' && (
+                <Link
+                  href="/profile/applications"
+                  className="relative p-2 text-gray-500 hover:text-pink-500 hover:bg-pink-50 rounded-full transition-all"
+                  title="申請履歴"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                  <ClipboardList className="w-6 h-6" />
+                  {totalUnread > 0 && (
+                    <span className="absolute top-1 right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500 border-2 border-white flex items-center justify-center text-[8px] text-white font-bold">
+                        !
+                      </span>
+                    </span>
+                  )}
+                </Link>
+              )}
 
-              {/* ドロップダウンメニュー */}
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fadeIn">
-                  {/* ユーザー情報 */}
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium">
-                        {user.username.charAt(0).toUpperCase()}
+              {/* Profile Dropdown Container */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-full border border-gray-200 hover:border-pink-300 hover:bg-pink-50 transition-all"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium text-sm">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 hidden lg:block max-w-[100px] truncate">
+                    {user.username}
+                  </span>
+                  <svg 
+                    className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fadeIn">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center text-white font-medium">
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 truncate">{user.username}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 truncate">{user.username}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${getUserTypeBadgeColor(user.user_type)}`}>
+                        {getUserTypeLabel(user.user_type)}
+                      </span>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        href="/profile"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="text-lg">👤</span>
+                        <span className="text-sm font-medium">プロフィール</span>
+                      </Link>
+                      
+                      <Link
+                        href="/profile/edit"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="text-lg">✏️</span>
+                        <span className="text-sm font-medium">プロフィール編集</span>
+                      </Link>
+
+                      {user.user_type !== 'shelter' && user.user_type !== 'admin' && (
+                        <Link
+                          href="/profile/applications"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-lg">📋</span>
+                          <span className="text-sm font-medium">申請履歴</span>
+                        </Link>
+                      )}
+
+                      {user.user_type === 'shelter' && (
+                        <Link
+                          href="/shelter/dashboard"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                          <span className="text-lg">🏠</span>
+                          <span className="text-sm font-medium">団体ダッシュボード</span>
+                        </Link>
+                      )}
+
+                      <div className="mt-1 pt-1 border-t border-gray-100">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 hover:bg-red-50 transition-all rounded-xl"
+                        >
+                          <span className="text-lg">🚪</span>
+                          <span className="text-sm font-medium">ログアウト</span>
+                        </button>
                       </div>
                     </div>
-                    <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full ${getUserTypeBadgeColor(user.user_type)}`}>
-                      {getUserTypeLabel(user.user_type)}
-                    </span>
                   </div>
+                )}
+              </div>
 
-                  {/* メニュー項目 */}
-                  <div className="py-1">
-                    <Link
-                      href="/profile"
-                      onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="text-lg">👤</span>
-                      <span className="text-sm font-medium">プロフィール</span>
-                    </Link>
-                    
-                    <Link
-                      href="/profile/edit"
-                      onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="text-lg">✏️</span>
-                      <span className="text-sm font-medium">プロフィール編集</span>
-                    </Link>
-
-                    <Link
-                      href="/applications"
-                      onClick={() => setIsDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="text-lg">📋</span>
-                      <span className="text-sm font-medium">申請履歴</span>
-                    </Link>
-
-                    {user.user_type === 'shelter' && (
-                      <Link
-                        href="/shelter/dashboard"
-                        onClick={() => setIsDropdownOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-blue-600 hover:bg-blue-50 transition-colors"
-                      >
-                        <span className="text-lg">🏠</span>
-                        <span className="text-sm font-medium">団体ダッシュボード</span>
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* ログアウト */}
-                  <div className="pt-1 border-t border-gray-100">
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-3 w-full px-4 py-2.5 text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <span className="text-lg">🚪</span>
-                      <span className="text-sm font-medium">ログアウト</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              <button
+                onClick={handleLogout}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                title="ログアウト"
+              >
+                <span className="text-sm font-medium">ログアウト</span>
+              </button>
+            </>
           ) : (
-            // 未ログイン
             <>
               <Link
                 href="/login"

@@ -12,10 +12,16 @@ import Footer from "@/components/common/Footer";
 
 export default function Home() {
   const [filters, setFilters] = useState<CatFilters>({});
+  const [page, setPage] = useState(1);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Use SWR for data fetching with filters
   const { data, error, isLoading } = useSWR(
-    ['/api/cats', filters],
+    ['/api/cats', { ...filters, page }],
     ([_, f]) => catsService.getCats(f)
   );
 
@@ -35,8 +41,14 @@ export default function Home() {
             <aside className="w-full lg:w-80 flex-shrink-0">
               <CatFilter 
                 filters={filters} 
-                onFilterChange={setFilters} 
-                onReset={() => setFilters({})}
+                onFilterChange={(newFilters) => {
+                  setFilters(newFilters);
+                  setPage(1);
+                }} 
+                onReset={() => {
+                  setFilters({});
+                  setPage(1);
+                }}
               />
             </aside>
 
@@ -79,10 +91,72 @@ export default function Home() {
                     条件に一致する保護猫は見つかりませんでした。
                   </p>
                   <button 
-                    onClick={() => setFilters({})} 
+                    onClick={() => {
+                      setFilters({});
+                      setPage(1);
+                    }} 
                     className="mt-4 text-pink-500 font-medium hover:underline"
                   >
                     条件をクリアする
+                  </button>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalCount > 0 && (
+                <div className="mt-12 flex justify-center items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page === 1}
+                    className={`p-2 rounded-lg border ${
+                      page === 1 
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    ←
+                  </button>
+                  
+                  {[...Array(Math.ceil(totalCount / 20))].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show first, last, current, and surrounding pages
+                    if (
+                      pageNum === 1 ||
+                      pageNum === Math.ceil(totalCount / 20) ||
+                      (pageNum >= page - 1 && pageNum <= page + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                            page === pageNum
+                              ? 'bg-pink-500 text-white shadow-md'
+                              : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (
+                      pageNum === page - 2 ||
+                      pageNum === page + 2
+                    ) {
+                      return <span key={pageNum} className="text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+
+                  <button
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page >= Math.ceil(totalCount / 20)}
+                    className={`p-2 rounded-lg border ${
+                      page >= Math.ceil(totalCount / 20)
+                        ? 'border-gray-200 text-gray-300 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    →
                   </button>
                 </div>
               )}

@@ -7,6 +7,7 @@ import Cookies from "js-cookie";
 import api from "@/lib/api";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import { ArrowRight, Trash2 } from "lucide-react";
 
 interface Application {
   id: number;
@@ -47,7 +48,7 @@ export default function ShelterApplicationsPage() {
       }
 
       try {
-        const response = await api.get("/api/applications/applications/");
+        const response = await api.get("/api/applications/");
         setApplications(response.data.results || response.data);
       } catch (err: any) {
         console.error("Failed to fetch applications:", err);
@@ -66,11 +67,12 @@ export default function ShelterApplicationsPage() {
 
   const getStatusInfo = (status: string) => {
     const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-      pending: { label: "応募直後", color: "text-orange-600", bgColor: "bg-orange-100" },
-      reviewing: { label: "確認/面談調整中", color: "text-blue-600", bgColor: "bg-blue-100" },
-      accepted: { label: "成立", color: "text-green-600", bgColor: "bg-green-100" },
-      rejected: { label: "不成立", color: "text-red-600", bgColor: "bg-red-100" },
-      cancelled: { label: "キャンセル", color: "text-gray-600", bgColor: "bg-gray-100" },
+      pending: { label: "未対応", color: "text-orange-600", bgColor: "bg-orange-100" },
+      reviewing: { label: "チャット中", color: "text-blue-600", bgColor: "bg-blue-100" },
+      trial: { label: "トライアル中", color: "text-purple-600", bgColor: "bg-purple-100" },
+      accepted: { label: "譲渡成立", color: "text-green-600", bgColor: "bg-green-100" },
+      rejected: { label: "お断り", color: "text-red-600", bgColor: "bg-red-100" },
+      cancelled: { label: "キャンセル済み", color: "text-gray-600", bgColor: "bg-gray-100" },
     };
     return statusConfig[status] || { label: status, color: "text-gray-600", bgColor: "bg-gray-100" };
   };
@@ -78,7 +80,7 @@ export default function ShelterApplicationsPage() {
   const updateStatus = async (applicationId: number, newStatus: string) => {
     setUpdatingId(applicationId);
     try {
-      await api.patch(`/api/applications/applications/${applicationId}/status/`, {
+      await api.patch(`/api/applications/${applicationId}/status/`, {
         status: newStatus,
       });
       
@@ -89,7 +91,7 @@ export default function ShelterApplicationsPage() {
       );
     } catch (err: any) {
       console.error("Failed to update status:", err);
-      alert("ステータスの更新に失敗しました。");
+      alert("ステータスの更新に失敗しました。現在のステータスからは変更できない可能性があります。");
     } finally {
       setUpdatingId(null);
     }
@@ -104,6 +106,7 @@ export default function ShelterApplicationsPage() {
     total: applications.length,
     pending: applications.filter((a) => a.status === "pending").length,
     reviewing: applications.filter((a) => a.status === "reviewing").length,
+    trial: applications.filter((a) => a.status === "trial").length,
     accepted: applications.filter((a) => a.status === "accepted").length,
   };
 
@@ -140,50 +143,66 @@ export default function ShelterApplicationsPage() {
           </div>
 
           {/* 統計カード */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <button
-              onClick={() => setStatusFilter("")}
-              className={`p-4 rounded-xl border transition-all ${
-                statusFilter === ""
-                  ? "bg-blue-50 border-blue-200"
-                  : "bg-white border-gray-100 hover:border-blue-200"
-              }`}
-            >
-              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-              <p className="text-sm text-gray-500">全件</p>
-            </button>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <button
               onClick={() => setStatusFilter("pending")}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border transition-all text-left relative overflow-hidden ${
                 statusFilter === "pending"
-                  ? "bg-orange-50 border-orange-200"
+                  ? "bg-orange-50 border-orange-200 ring-2 ring-orange-200"
                   : "bg-white border-gray-100 hover:border-orange-200"
               }`}
             >
-              <p className="text-2xl font-bold text-orange-600">{stats.pending}</p>
-              <p className="text-sm text-gray-500">未確認</p>
+              <div className="flex justify-between items-start">
+                <p className="text-xs font-bold text-gray-400 mb-1">未対応</p>
+                {stats.pending > 0 && (
+                  <span className="flex h-2 w-2 rounded-full bg-orange-500"></span>
+                )}
+              </div>
+              <p className="text-2xl font-bold text-orange-600">{stats.pending}<span className="text-sm ml-1 font-normal text-gray-500">件</span></p>
             </button>
             <button
               onClick={() => setStatusFilter("reviewing")}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border transition-all text-left ${
                 statusFilter === "reviewing"
-                  ? "bg-blue-50 border-blue-200"
+                  ? "bg-blue-50 border-blue-200 ring-2 ring-blue-200"
                   : "bg-white border-gray-100 hover:border-blue-200"
               }`}
             >
-              <p className="text-2xl font-bold text-blue-600">{stats.reviewing}</p>
-              <p className="text-sm text-gray-500">確認中</p>
+              <p className="text-xs font-bold text-gray-400 mb-1">チャット中</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.reviewing}<span className="text-sm ml-1 font-normal text-gray-500">件</span></p>
+            </button>
+            <button
+              onClick={() => setStatusFilter("trial")}
+              className={`p-4 rounded-xl border transition-all text-left ${
+                statusFilter === "trial"
+                  ? "bg-purple-50 border-purple-200 ring-2 ring-purple-200"
+                  : "bg-white border-gray-100 hover:border-purple-200"
+              }`}
+            >
+              <p className="text-xs font-bold text-gray-400 mb-1">トライアル中</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.trial}<span className="text-sm ml-1 font-normal text-gray-500">件</span></p>
             </button>
             <button
               onClick={() => setStatusFilter("accepted")}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border transition-all text-left ${
                 statusFilter === "accepted"
-                  ? "bg-green-50 border-green-200"
+                  ? "bg-green-50 border-green-200 ring-2 ring-green-200"
                   : "bg-white border-gray-100 hover:border-green-200"
               }`}
             >
-              <p className="text-2xl font-bold text-green-600">{stats.accepted}</p>
-              <p className="text-sm text-gray-500">成立</p>
+              <p className="text-xs font-bold text-gray-400 mb-1">譲渡成立</p>
+              <p className="text-2xl font-bold text-green-600">{stats.accepted}<span className="text-sm ml-1 font-normal text-gray-500">件</span></p>
+            </button>
+            <button
+              onClick={() => setStatusFilter("")}
+              className={`p-4 rounded-xl border transition-all text-left ${
+                statusFilter === ""
+                  ? "bg-gray-50 border-gray-200 ring-2 ring-gray-200"
+                  : "bg-white border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <p className="text-xs font-bold text-gray-400 mb-1">全件</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.total}<span className="text-sm ml-1 font-normal text-gray-500">件</span></p>
             </button>
           </div>
 
@@ -204,12 +223,13 @@ export default function ShelterApplicationsPage() {
                 return (
                   <div
                     key={application.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
+                    onClick={() => router.push(`/shelter/applications/${application.id}`)}
+                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
                   >
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                       {/* 猫情報 */}
                       <div className="flex items-center gap-4 flex-1">
-                        <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                        <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 group-hover:ring-2 group-hover:ring-blue-100 transition-all">
                           {application.cat_detail.primary_image ? (
                             <img
                               src={application.cat_detail.primary_image}
@@ -223,12 +243,9 @@ export default function ShelterApplicationsPage() {
                           )}
                         </div>
                         <div>
-                          <Link
-                            href={`/cats/${application.cat_detail.id}`}
-                            className="font-semibold text-gray-800 hover:text-blue-600 transition-colors"
-                          >
+                          <div className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
                             {application.cat_detail.name}
-                          </Link>
+                          </div>
                           <p className="text-sm text-gray-500">
                             {application.cat_detail.breed || "MIX"}
                           </p>
@@ -239,7 +256,7 @@ export default function ShelterApplicationsPage() {
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">申請者</p>
                         <p className="font-medium text-gray-800">
-                          {application.full_name || application.applicant_info.username}
+                          {application.applicant_info.username} さん
                         </p>
                         <p className="text-xs text-gray-400">
                           {new Date(application.applied_at).toLocaleDateString("ja-JP")} 申請
@@ -247,49 +264,41 @@ export default function ShelterApplicationsPage() {
                       </div>
 
                       {/* ステータス */}
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex items-center gap-3">
                         <span
-                          className={`inline-block px-3 py-1.5 text-sm font-medium rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}
+                          className={`inline-block px-3 py-1.5 text-sm font-bold rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}
                         >
                           {statusInfo.label}
                         </span>
-                      </div>
 
-                      {/* アクション */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {application.status === "pending" && (
+                        {/* 削除（アーカイブ）ボタン */}
+                        {['accepted', 'rejected', 'cancelled'].includes(application.status) && (
                           <button
-                            onClick={() => updateStatus(application.id, "reviewing")}
-                            disabled={isUpdating}
-                            className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              if (confirm("この履歴を非表示にしますか？")) {
+                                try {
+                                  await api.post(`/api/applications/${application.id}/archive/`);
+                                  setApplications(prev => prev.filter(a => a.id !== application.id));
+                                } catch (err) {
+                                  alert("履歴の非表示に失敗しました。");
+                                }
+                              }
+                            }}
+                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                            title="履歴から削除"
                           >
-                            確認中へ
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
-                        {application.status === "reviewing" && (
-                          <>
-                            <button
-                              onClick={() => updateStatus(application.id, "accepted")}
-                              disabled={isUpdating}
-                              className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-                            >
-                              承認
-                            </button>
-                            <button
-                              onClick={() => updateStatus(application.id, "rejected")}
-                              disabled={isUpdating}
-                              className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-                            >
-                              不承認
-                            </button>
-                          </>
-                        )}
-                        <Link
-                          href={`/shelter/applications/${application.id}`}
-                          className="px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                          詳細
-                        </Link>
+                      </div>
+
+                      {/* アクション省略（詳細ページへ統合） */}
+                      <div className="hidden md:block">
+                        <div className="bg-gray-50 p-2 rounded-full text-gray-300 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
+                          <ArrowRight className="w-5 h-5" />
+                        </div>
                       </div>
                     </div>
 
@@ -297,7 +306,7 @@ export default function ShelterApplicationsPage() {
                     {application.motivation && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <p className="text-sm text-gray-500 mb-1">応募動機</p>
-                        <p className="text-sm text-gray-700 line-clamp-2">
+                        <p className="text-sm text-gray-700 line-clamp-1 group-hover:text-gray-900 transition-colors">
                           {application.motivation}
                         </p>
                       </div>

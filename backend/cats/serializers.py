@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Cat, CatImage, CatVideo
+from shelters.models import ShelterUser
 
 class CatImageSerializer(serializers.ModelSerializer):
     """保護猫画像シリアライザー"""
@@ -44,7 +45,7 @@ class CatListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cat
         fields = [
-            'id', 'name', 'gender', 'age_years', 'age_months',
+            'id', 'name', 'gender', 'age_category', 'estimated_age',
             'breed', 'size', 'color', 'status', 'primary_image',
             'shelter_name', 'created_at'
         ]
@@ -62,9 +63,16 @@ class ShelterInfoSerializer(serializers.Serializer):
     """保護団体情報シリアライザー（CatDetail用のネストされたシリアライザー）"""
     id = serializers.IntegerField(read_only=True)
     name = serializers.CharField(read_only=True)
+    shelter_type = serializers.CharField(read_only=True)
+    prefecture = serializers.CharField(read_only=True)
+    city = serializers.CharField(read_only=True)
     address = serializers.CharField(read_only=True)
     phone = serializers.CharField(read_only=True, allow_blank=True)
     email = serializers.EmailField(read_only=True, allow_blank=True)
+    website_url = serializers.URLField(read_only=True, allow_blank=True)
+    sns_url = serializers.URLField(read_only=True, allow_blank=True)
+    business_hours = serializers.CharField(read_only=True, allow_blank=True)
+    transfer_available_hours = serializers.CharField(read_only=True, allow_blank=True)
 
 
 class CatDetailSerializer(serializers.ModelSerializer):
@@ -81,9 +89,20 @@ class CatDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cat
         fields = [
-            'id', 'name', 'gender', 'age_years', 'age_months',
-            'breed', 'size', 'color', 'personality', 'health_status',
-            'vaccination', 'neutered', 'description', 'status',
+            'id', 'name', 'gender', 'age_category', 'estimated_age',
+            'breed', 'size', 'color', 
+            
+            # 詳細情報
+            'spay_neuter_status', 'vaccination_status', 'health_status_category', 
+            'fiv_felv_status', 'health_notes',
+            
+            # 性格
+            'human_distance', 'activity_level', 'personality',
+            
+            # 譲渡条件
+            'interview_format', 'trial_period', 'transfer_fee', 'fee_details',
+            
+            'description', 'status',
             'images', 'videos', 'primary_image', 'shelter', 'shelter_name', 
             'created_at', 'updated_at'
         ]
@@ -104,7 +123,68 @@ class CatCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cat
         fields = [
-            'name', 'gender', 'age_years', 'age_months',
-            'breed', 'size', 'color', 'personality', 'health_status',
-            'vaccination', 'neutered', 'description', 'status'
+            'name', 'gender', 'age_category', 'estimated_age',
+            'breed', 'size', 'color', 
+            'spay_neuter_status', 'vaccination_status', 'health_status_category', 
+            'fiv_felv_status', 'health_notes',
+            'human_distance', 'activity_level', 'personality',
+            'interview_format', 'trial_period', 'transfer_fee', 'fee_details',
+            'description', 'status'
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        
+        # 管理者以外の場合、制限フィールドをバリデーション対象外（任意）にする
+        if request:
+            is_admin = request.user.is_superuser
+            if not is_admin:
+                shelter_user = ShelterUser.objects.filter(user=request.user, is_active=True).first()
+                if shelter_user and shelter_user.role == 'admin':
+                    is_admin = True
+
+            if not is_admin:
+                restricted_fields = [
+                    'status', 'description',
+                    'health_notes', 'spay_neuter_status', 'vaccination_status', 
+                    'health_status_category', 'fiv_felv_status',
+                    'transfer_fee', 'fee_details', 'interview_format', 'trial_period'
+                ]
+                for field_name in restricted_fields:
+                    if field_name in self.fields:
+                        self.fields[field_name].required = False
+                        self.fields[field_name].allow_blank = True
+
+    def update(self, instance, validated_data):
+        """医療情報と募集詳細の変更制限"""
+        request = self.context.get('request')
+        
+        # 管理者（システム全体or団体内）以外の場合、以下のフィールドの変更を無効化（元の値を保持）
+        if request:
+            is_admin = request.user.is_superuser
+            if not is_admin:
+                shelter_user = ShelterUser.objects.filter(
+                    user=request.user, 
+                    shelter=instance.shelter,
+                    is_active=True
+                ).first()
+                if shelter_user and shelter_user.role == 'admin':
+                    is_admin = True
+
+            if not is_admin:
+                restricted_fields = [
+                    # 掲載管理
+                    'status', 'description',
+                    # 医療情報
+                    'health_notes', 'spay_neuter_status', 'vaccination_status', 
+                    'health_status_category', 'fiv_felv_status',
+                    # 譲渡条件
+                    'transfer_fee', 'fee_details', 'interview_format', 'trial_period'
+                ]
+                
+                for field in restricted_fields:
+                    if field in validated_data:
+                        validated_data.pop(field)
+
+        return super().update(instance, validated_data)

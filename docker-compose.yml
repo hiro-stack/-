@@ -24,7 +24,7 @@ services:
     container_name: cat_matching_backend
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000 --noreload"
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
@@ -41,6 +41,8 @@ services:
       - SECRET_KEY=django-insecure-dev-key
       - DEBUG=True
       - ALLOWED_HOSTS=*
+      - EMAIL_HOST_USER=zhanghiromo@gmail.com
+      - EMAIL_HOST_PASSWORD=dkau tizh ihxt qfvy
 
   frontend:
     build: ./frontend

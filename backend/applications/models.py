@@ -11,11 +11,12 @@ class Application(models.Model):
     """応募モデル"""
     
     STATUS_CHOICES = [
-        ('pending', '応募直後'),
-        ('reviewing', '確認/面談調整中'),
-        ('accepted', '成立'),
-        ('rejected', '不成立'),
-        ('cancelled', 'キャンセル'),
+        ('pending', '新着（未確認）'),
+        ('reviewing', '審査・面談中'),
+        ('trial', 'トライアル中'),
+        ('accepted', '譲渡完了'),
+        ('rejected', 'お断り'),
+        ('cancelled', 'キャンセル済み'),
     ]
     
     cat = models.ForeignKey(
@@ -48,66 +49,61 @@ class Application(models.Model):
         verbose_name='応募時メッセージ'
     )
     
-    # 応募者情報
-    full_name = models.CharField(
-        max_length=100,
-        verbose_name='氏名'
+    # --- C. 応募時のみ（団体提出用・非公開） ---
+    
+    # 同意事項
+    term_agreement = models.BooleanField(
+        default=False,
+        verbose_name='利用規約・個人情報保護方針への同意'
     )
-    age = models.PositiveSmallIntegerField(
-        validators=[MaxValueValidator(120)],
-        verbose_name='年齢'
+    
+    lifelong_care_agreement = models.BooleanField(
+        default=False,
+        verbose_name='終生飼養への同意'
     )
-    occupation = models.CharField(
-        max_length=100,
-        verbose_name='職業'
+    
+    spay_neuter_agreement = models.BooleanField(
+        default=False,
+        verbose_name='不妊去勢への同意'
     )
-    phone_number = models.CharField(
+    
+    medical_cost_understanding = models.BooleanField(
+        default=False,
+        verbose_name='医療費負担への理解'
+    )
+    
+    # 追加情報
+    INCOME_STATUS_CHOICES = [
+        ('stable', '安定'),
+        ('unstable', 'やや不安定'),
+        # 必要に応じて追加
+    ]
+    income_status = models.CharField(
         max_length=20,
-        verbose_name='電話番号'
-    )
-    address = models.TextField(
-        verbose_name='住所'
-    )
-    
-    # 飼育環境
-    housing_type = models.CharField(
-        max_length=100,
-        verbose_name='住居タイプ'
-    )
-    has_garden = models.BooleanField(
-        default=False,
-        verbose_name='庭の有無'
-    )
-    family_members = models.PositiveSmallIntegerField(
-        validators=[MaxValueValidator(20)],
-        verbose_name='家族構成（人数）'
-    )
-    has_other_pets = models.BooleanField(
-        default=False,
-        verbose_name='他のペットの有無'
-    )
-    other_pets_description = models.TextField(
-        blank=True,
-        verbose_name='他のペットの詳細'
+        choices=INCOME_STATUS_CHOICES,
+        default='stable',
+        verbose_name='収入状況'
     )
     
-    # 飼育経験
-    has_experience = models.BooleanField(
+    emergency_contact_available = models.BooleanField(
         default=False,
-        verbose_name='飼育経験の有無'
-    )
-    experience_description = models.TextField(
-        blank=True,
-        verbose_name='飼育経験の詳細'
+        verbose_name='緊急時の預け先の有無'
     )
     
-    # その他
-    motivation = models.TextField(
-        verbose_name='応募動機'
+    family_consent = models.BooleanField(
+        default=False,
+        verbose_name='家族全員の同意'
     )
-    additional_notes = models.TextField(
-        blank=True,
-        verbose_name='その他・備考'
+    
+    allergy_status = models.BooleanField(
+        default=False,
+        verbose_name='アレルギー有無',
+        help_text='家族含む'
+    )
+    
+    cafe_data_sharing_consent = models.BooleanField(
+        default=False,
+        verbose_name='カフェへの情報提供同意'
     )
     
     applied_at = models.DateTimeField(
@@ -118,20 +114,30 @@ class Application(models.Model):
         auto_now=True,
         verbose_name='更新日時'
     )
+
+    # 履歴の非表示・アーカイブ用
+    is_hidden_by_applicant = models.BooleanField(
+        default=False,
+        verbose_name='応募者側で非表示'
+    )
+    is_hidden_by_shelter = models.BooleanField(
+        default=False,
+        verbose_name='団体側で非表示'
+    )
     
     class Meta:
         verbose_name = '応募'
         verbose_name_plural = '応募'
         ordering = ['-applied_at']
-        # unique_together を削除して再応募を許可
-        # 代わりに有効応募のみユニークにする制約を追加
-        constraints = [
-            models.UniqueConstraint(
-                fields=['cat', 'applicant'],
-                condition=models.Q(status__in=['pending', 'reviewing', 'accepted']),
-                name='unique_active_application'
-            )
-        ]
+        # MySQL does not support conditional unique constraints.
+        # Uniqueness for active applications will be enforced in application logic (Serializer/View).
+        # constraints = [
+        #     models.UniqueConstraint(
+        #         fields=['cat', 'applicant'],
+        #         condition=models.Q(status__in=['pending', 'reviewing', 'accepted']),
+        #         name='unique_active_application'
+        #     )
+        # ]
         indexes = [
             models.Index(fields=['applicant']),
             models.Index(fields=['cat']),
@@ -157,11 +163,46 @@ class Application(models.Model):
     
     def save(self, *args, **kwargs):
         # 新規作成時にshelterを自動設定
-        if not self.pk and not self.shelter_id:
+        is_new = not self.pk
+        if is_new and not self.shelter_id and self.cat_id:
             self.shelter = self.cat.shelter
+        
         # 保存前にバリデーション実行
         self.full_clean()
+        
+        # ステータス変更の検知
+        old_status = None
+        if not is_new:
+            old_status = Application.objects.get(pk=self.pk).status
+            
         super().save(*args, **kwargs)
+        
+        # 猫のステータス同期
+        if old_status != self.status:
+            self.sync_cat_status()
+
+    def sync_cat_status(self):
+        """応募状況に応じて猫のステータスを更新する"""
+        cat = self.cat
+        
+        # 1. 誰かが成立(accepted)していたら「譲渡済み」
+        if Application.objects.filter(cat=cat, status='accepted').exists():
+            cat.status = 'adopted'
+        # 2. 誰かがトライアル中(trial)なら「トライアル中」
+        elif Application.objects.filter(cat=cat, status='trial').exists():
+            cat.status = 'trial'
+        # 3. 誰かが審査中(reviewing)なら「審査中」
+        elif Application.objects.filter(cat=cat, status='reviewing').exists():
+            cat.status = 'in_review'
+        # 4. それ以外で、もし現在が「不承認」や「キャンセル」になった結果なら「募集中」に戻す
+        # (ただし、明示的に一時停止(paused)にされている場合は維持したいかもしれないが、
+        #  基本フローとしては応募が無くなれば自動的に「募集中」に戻るのが親切)
+        elif self.status in ['rejected', 'cancelled']:
+            # 他に動いている応募がないか最終確認
+            if not Application.objects.filter(cat=cat, status__in=['pending', 'reviewing', 'trial']).exists():
+                cat.status = 'open'
+        
+        cat.save()
 
 
 class ApplicationEvent(models.Model):
@@ -308,8 +349,15 @@ class Message(models.Model):
                 'admin': 'admin',
             }
             expected_sender_type = expected_mapping.get(self.sender.user_type)
-            
-            if expected_sender_type and self.sender_type != expected_sender_type:
+
+            # 緩和：shelterユーザーは立場に応じて 'shelter' または 'user' のどちらでも送信可能とする
+            # (例：保護団体スタッフが他団体の猫に応募した場合は 'user' になる)
+            if self.sender.user_type == 'shelter':
+                if self.sender_type not in ['shelter', 'user']:
+                    raise ValidationError({
+                        'sender_type': 'Shelter users must send as "shelter" or "user"'
+                    })
+            elif expected_sender_type and self.sender_type != expected_sender_type:
                 raise ValidationError({
                     'sender_type': f'sender_type must be "{expected_sender_type}" for user_type "{self.sender.user_type}"'
                 })

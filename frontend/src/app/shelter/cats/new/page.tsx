@@ -12,33 +12,62 @@ import { Image as ImageIcon, Plus, X } from "lucide-react";
 interface CatFormData {
   name: string;
   gender: string;
-  age_years: number;
-  age_months: number;
+  age_category: string;
+  estimated_age: string;
   breed: string;
   size: string;
   color: string;
+  
+  // Health
+  spay_neuter_status: string;
+  vaccination_status: string;
+  health_status_category: string;
+  fiv_felv_status: string;
+  health_notes: string;
+  
+  // Personality
+  human_distance: string;
+  activity_level: string;
   personality: string;
-  health_status: string;
-  vaccination: boolean;
-  neutered: boolean;
+  
+  // Transfer
+  interview_format: string;
+  trial_period: string;
+  transfer_fee: number;
+  fee_details: string;
+
   description: string;
   status: string;
+  is_public: boolean;
 }
 
 const initialFormData: CatFormData = {
   name: "",
   gender: "unknown",
-  age_years: 0,
-  age_months: 0,
+  age_category: "unknown",
+  estimated_age: "",
   breed: "",
   size: "medium",
   color: "",
+  
+  spay_neuter_status: "unknown",
+  vaccination_status: "unknown",
+  health_status_category: "unknown",
+  fiv_felv_status: "unknown",
+  health_notes: "",
+  
+  human_distance: "unknown",
+  activity_level: "unknown",
   personality: "",
-  health_status: "",
-  vaccination: false,
-  neutered: false,
+  
+  interview_format: "offline",
+  trial_period: "",
+  transfer_fee: 0,
+  fee_details: "",
+
   description: "",
   status: "open",
+  is_public: false,
 };
 
 export default function NewCatPage() {
@@ -47,6 +76,7 @@ export default function NewCatPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   // 画像アップロード用State
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -67,6 +97,7 @@ export default function NewCatPage() {
           router.push("/");
           return;
         }
+        setUser(response.data);
       } catch (error) {
         router.push("/shelter/login");
         return;
@@ -144,12 +175,11 @@ export default function NewCatPage() {
           });
         } catch (imageErr) {
           console.error("Image upload failed:", imageErr);
-          // 画像アップロード失敗しても、猫自体は作成されているのでリダイレクトは続行するが、
-          // ユーザーに伝えるべきかもしれない。今回は簡易的にコンソールログのみ。
         }
       }
 
-      router.push(`/shelter/cats/${catId}/edit?created=true`);
+      // 作成後の編集画面へ（あるいは一覧へ戻る）
+      router.push(`/shelter/cats/`);
     } catch (err: any) {
       console.error("Create error:", err);
       if (err.response?.data) {
@@ -158,7 +188,7 @@ export default function NewCatPage() {
 
         Object.keys(data).forEach((key) => {
           if (Array.isArray(data[key])) {
-            fieldErrors[key] = data[key][0];
+            fieldErrors[key] = data[key].join(" ");
           } else if (typeof data[key] === "string") {
             fieldErrors[key] = data[key];
           }
@@ -193,7 +223,7 @@ export default function NewCatPage() {
       <Header />
 
       <main className="pt-24 pb-16 px-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* パンくずリスト */}
           <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
             <Link href="/shelter/dashboard" className="hover:text-blue-600">
@@ -215,7 +245,7 @@ export default function NewCatPage() {
               </div>
               <h1 className="text-2xl font-bold text-gray-800">新しい猫を登録</h1>
               <p className="text-gray-500 mt-2 text-sm">
-                保護猫の情報を入力してください
+                保護猫の詳細情報を入力してください
               </p>
             </div>
 
@@ -226,7 +256,7 @@ export default function NewCatPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
               {/* メイン画像アップロード */}
               <div className="flex flex-col items-center justify-center mb-8">
                 <input
@@ -265,9 +295,11 @@ export default function NewCatPage() {
                 <p className="mt-2 text-sm text-gray-500">メイン画像（任意）</p>
               </div>
 
-              {/* 基本情報 */}
-              <div className="border-b border-gray-100 pb-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">基本情報</h2>
+              {/* A. 基本情報 */}
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <span className="text-xl">📝</span> 基本情報
+                </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* 名前 */}
@@ -282,12 +314,9 @@ export default function NewCatPage() {
                       value={formData.name}
                       onChange={handleChange}
                       required
-                      className={`w-full px-4 py-3 rounded-xl border ${
-                        errors.name ? "border-red-300 bg-red-50" : "border-gray-200"
-                      } focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all`}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
                       placeholder="例：ミケ"
                     />
-                    {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
                   </div>
 
                   {/* 性別 */}
@@ -300,7 +329,7 @@ export default function NewCatPage() {
                       name="gender"
                       value={formData.gender}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
                     >
                       <option value="male">オス</option>
                       <option value="female">メス</option>
@@ -308,37 +337,39 @@ export default function NewCatPage() {
                     </select>
                   </div>
 
-                  {/* 年齢（年） */}
+                  {/* 年齢区分 */}
                   <div>
-                    <label htmlFor="age_years" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      年齢（年）
+                    <label htmlFor="age_category" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      年齢区分
                     </label>
-                    <input
-                      type="number"
-                      id="age_years"
-                      name="age_years"
-                      value={formData.age_years}
+                    <select
+                      id="age_category"
+                      name="age_category"
+                      value={formData.age_category}
                       onChange={handleChange}
-                      min="0"
-                      max="30"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                    />
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                    >
+                      <option value="kitten">子猫</option>
+                      <option value="adult">成猫</option>
+                      <option value="senior">シニア猫</option>
+                      <option value="unknown">不明</option>
+                    </select>
                   </div>
 
-                  {/* 年齢（月） */}
+                  {/* 推定年齢 */}
                   <div>
-                    <label htmlFor="age_months" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      年齢（月）
+                    <label htmlFor="estimated_age" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      推定年齢 (テキスト) <span className="text-red-400">*</span>
                     </label>
                     <input
-                      type="number"
-                      id="age_months"
-                      name="age_months"
-                      value={formData.age_months}
+                      type="text"
+                      id="estimated_age"
+                      name="estimated_age"
+                      value={formData.estimated_age}
                       onChange={handleChange}
-                      min="0"
-                      max="11"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                      required
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                      placeholder="例：2歳くらい、2023年春生まれ"
                     />
                   </div>
 
@@ -353,8 +384,8 @@ export default function NewCatPage() {
                       name="breed"
                       value={formData.breed}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                      placeholder="例：三毛猫、MIX"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                      placeholder="例：MIX、三毛猫"
                     />
                   </div>
 
@@ -368,7 +399,7 @@ export default function NewCatPage() {
                       name="size"
                       value={formData.size}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
                     >
                       <option value="small">小型</option>
                       <option value="medium">中型</option>
@@ -387,42 +418,240 @@ export default function NewCatPage() {
                       name="color"
                       value={formData.color}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                      placeholder="例：白・茶・黒（三毛）"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                      placeholder="例：白黒、茶トラ"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* 性格・説明 */}
-              <div className="border-b border-gray-100 pb-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">性格・説明</h2>
+              {/* B. 性格・特徴 */}
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <span className="text-xl">✨</span> 性格・特徴
+                </h2>
                 
-                <div className="space-y-4">
-                  {/* 性格 */}
-                  <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     {/* 人への距離感 */}
+                    <div>
+                        <label htmlFor="human_distance" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        人への距離感
+                        </label>
+                        <select
+                        id="human_distance"
+                        name="human_distance"
+                        value={formData.human_distance}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                        >
+                            <option value="cuddly">抱っこ好き</option>
+                            <option value="ok">抱っこ可</option>
+                            <option value="shy">抱っこ苦手</option>
+                            <option value="unknown">不明</option>
+                        </select>
+                    </div>
+
+                     {/* 活動量 */}
+                    <div>
+                        <label htmlFor="activity_level" className="block text-sm font-medium text-gray-700 mb-1.5">
+                        活発さ
+                        </label>
+                        <select
+                        id="activity_level"
+                        name="activity_level"
+                        value={formData.activity_level}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none"
+                        >
+                             <option value="active">活発</option>
+                             <option value="normal">普通</option>
+                             <option value="calm">おっとり</option>
+                             <option value="unknown">不明</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* 性格詳細 */}
+                <div>
                     <label htmlFor="personality" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      性格 <span className="text-red-400">*</span>
+                        性格詳細 <span className="text-red-400">*</span>
                     </label>
                     <textarea
-                      id="personality"
-                      name="personality"
-                      value={formData.personality}
-                      onChange={handleChange}
-                      required
-                      rows={3}
-                      className={`w-full px-4 py-3 rounded-xl border ${
-                        errors.personality ? "border-red-300 bg-red-50" : "border-gray-200"
-                      } focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none`}
-                      placeholder="例：人懐っこく、甘えん坊な性格です..."
+                        id="personality"
+                        name="personality"
+                        value={formData.personality}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none resize-none"
+                        placeholder="例：とても人懐っこく、おもちゃで遊ぶのが大好きです。"
                     />
-                    {errors.personality && <p className="mt-1 text-sm text-red-500">{errors.personality}</p>}
-                  </div>
+                </div>
+              </div>
+              
+              {/* C. 医療情報 */}
+               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <span className="text-xl">🏥</span> 医療情報
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     {/* 不妊去勢 */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            不妊去勢
+                        </label>
+                        <select
+                            name="spay_neuter_status"
+                            value={formData.spay_neuter_status}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        >
+                            <option value="not_yet">未実施</option>
+                            <option value="done">実施済み</option>
+                            <option value="planned">予定あり</option>
+                            <option value="unknown">不明</option>
+                        </select>
+                    </div>
+                    {/* ワクチン */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            ワクチン接種
+                        </label>
+                         <select
+                            name="vaccination_status"
+                            value={formData.vaccination_status}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        >
+                            <option value="not_yet">未接種</option>
+                            <option value="done">接種済み</option>
+                            <option value="partial">一部接種</option>
+                            <option value="unknown">不明</option>
+                        </select>
+                    </div>
+                     {/* ウイルス検査 */}
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            ウイルス検査 (FIV/FeLV)
+                        </label>
+                         <select
+                            name="fiv_felv_status"
+                            value={formData.fiv_felv_status}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        >
+                            <option value="negative">陰性 (-)</option>
+                            <option value="positive_fiv">FIV陽性 (+)</option>
+                             <option value="positive_felv">FeLV陽性 (+)</option>
+                             <option value="positive_double">ダブルキャリア</option>
+                             <option value="untested">未検査</option>
+                             <option value="unknown">不明</option>
+                        </select>
+                    </div>
+                    {/* 健康状態区分 */}
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            現在の健康状態
+                        </label>
+                         <select
+                            name="health_status_category"
+                            value={formData.health_status_category}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        >
+                            <option value="healthy">問題なし</option>
+                            <option value="needs_care">ケアあり</option>
+                             <option value="treatment">継続治療中</option>
+                             <option value="unknown">不明</option>
+                        </select>
+                    </div>
+                </div>
+                 {/* 医療詳細メモ */}
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        医療特記事項
+                    </label>
+                    <textarea
+                        name="health_notes"
+                        value={formData.health_notes}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none resize-none"
+                        placeholder="例：過去に猫風邪の既往歴があります。現在は完治しています。"
+                    />
+                </div>
+               </div>
 
-                  {/* 説明 */}
-                  <div>
+              {/* D. 募集詳細・譲渡条件 */}
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    <span className="text-xl">🤝</span> 募集詳細・譲渡条件
+                </h2>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     {/* 面談形式 */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            面談形式
+                        </label>
+                        <select
+                            name="interview_format"
+                            value={formData.interview_format}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        >
+                             <option value="offline">対面のみ</option>
+                             <option value="online">オンラインのみ</option>
+                             <option value="both">対面・オンライン可</option>
+                        </select>
+                    </div>
+                     {/* トライアル期間 */}
+                    <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            トライアル期間
+                        </label>
+                        <input
+                            type="text"
+                            name="trial_period"
+                            value={formData.trial_period}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                            placeholder="例：2週間"
+                        />
+                    </div>
+                     {/* 譲渡費用 */}
+                     <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            譲渡費用 (円) <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            name="transfer_fee"
+                            value={formData.transfer_fee}
+                            onChange={handleChange}
+                            min="0"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"
+                        />
+                    </div>
+                </div>
+                {/* 費用詳細 */}
+                <div className="mb-4">
+                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            費用の内訳
+                        </label>
+                        <textarea
+                            name="fee_details"
+                            value={formData.fee_details}
+                            onChange={handleChange}
+                            rows={2}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none resize-none"
+                            placeholder="例：ワクチン、ウイルス検査費、避妊手術費として"
+                        />
+                </div>
+
+                {/* 紹介文 */}
+                 <div>
                     <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      詳しい説明 <span className="text-red-400">*</span>
+                      全体の紹介文 <span className="text-red-400">*</span>
                     </label>
                     <textarea
                       id="description"
@@ -431,83 +660,66 @@ export default function NewCatPage() {
                       onChange={handleChange}
                       required
                       rows={5}
-                      className={`w-full px-4 py-3 rounded-xl border ${
-                        errors.description ? "border-red-300 bg-red-50" : "border-gray-200"
-                      } focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none`}
-                      placeholder="保護の経緯や、普段の様子などを詳しく記載してください..."
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none resize-none"
+                      placeholder="保護の経緯、これまでのストーリー、未来の家族へのメッセージなど..."
                     />
-                    {errors.description && <p className="mt-1 text-sm text-red-500">{errors.description}</p>}
                   </div>
-                </div>
               </div>
-
-              {/* 健康状態 */}
-              <div className="border-b border-gray-100 pb-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">健康状態</h2>
-
-                <div className="space-y-4">
-                  {/* 健康状態 */}
-                  <div>
-                    <label htmlFor="health_status" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      健康状態 <span className="text-red-400">*</span>
-                    </label>
-                    <textarea
-                      id="health_status"
-                      name="health_status"
-                      value={formData.health_status}
+              
+              {/* 公開設定 */}
+              <div className="bg-white p-6 rounded-2xl border-2 border-indigo-50 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 pr-4">
+                    <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+                      <span className="text-xl">🌐</span> 公開設定
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-3">
+                      一般ユーザーにこの猫の情報を公開しますか？
+                    </p>
+                    
+                    {user?.shelter_info?.verification_status !== 'approved' && (
+                      <div className="p-3 bg-orange-50 rounded-xl border border-orange-100 flex items-start gap-2 mb-4">
+                        <span className="text-orange-500 text-lg">⚠️</span>
+                        <p className="text-xs text-orange-800 leading-relaxed font-medium">
+                          現在、団体情報の審査中です。<br />
+                          運営による承認が完了するまで、「公開」に設定することはできません。
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="is_public"
+                      name="is_public"
+                      checked={formData.is_public}
                       onChange={handleChange}
-                      required
-                      rows={3}
-                      className={`w-full px-4 py-3 rounded-xl border ${
-                        errors.health_status ? "border-red-300 bg-red-50" : "border-gray-200"
-                      } focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none`}
-                      placeholder="例：ワクチン接種済み、健康状態良好..."
+                      disabled={user?.shelter_info?.verification_status !== 'approved'}
+                      className="sr-only peer"
                     />
-                    {errors.health_status && <p className="mt-1 text-sm text-red-500">{errors.health_status}</p>}
-                  </div>
-
-                  {/* チェックボックス */}
-                  <div className="flex gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="vaccination"
-                        checked={formData.vaccination}
-                        onChange={handleChange}
-                        className="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-200"
-                      />
-                      <span className="text-sm text-gray-700">ワクチン接種済み</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="neutered"
-                        checked={formData.neutered}
-                        onChange={handleChange}
-                        className="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-200"
-                      />
-                      <span className="text-sm text-gray-700">去勢・避妊済み</span>
-                    </label>
+                    <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
                   </div>
                 </div>
-              </div>
 
-              {/* ステータス */}
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">募集状態</h2>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                >
-                  <option value="open">募集中</option>
-                  <option value="paused">一時停止</option>
-                  <option value="in_review">審査中</option>
-                  <option value="trial">トライアル中</option>
-                  <option value="adopted">譲渡済み</option>
-                </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-50">
+                  <div>
+                    <label htmlFor="status" className="block text-xs font-bold text-gray-400 uppercase mb-2">現在の募集ステータス</label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 outline-none text-sm font-medium"
+                    >
+                      <option value="open">募集中</option>
+                      <option value="paused">一時停止</option>
+                      <option value="in_review">審査中</option>
+                      <option value="trial">トライアル中</option>
+                      <option value="adopted">譲渡済み</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* ボタン */}
@@ -523,29 +735,7 @@ export default function NewCatPage() {
                   disabled={isLoading}
                   className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:from-blue-700 hover:to-indigo-600 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      登録中...
-                    </span>
-                  ) : (
-                    "猫を登録"
-                  )}
+                  {isLoading ? "登録中..." : "猫を登録"}
                 </button>
               </div>
             </form>

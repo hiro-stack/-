@@ -1,11 +1,25 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from .models import ApplicantProfile
 
 User = get_user_model()
 
 
 from shelters.models import ShelterUser
+
+class ApplicantProfileSerializer(serializers.ModelSerializer):
+    """応募者プロフィールシリアライザー"""
+    
+    class Meta:
+        model = ApplicantProfile
+        fields = [
+            'age', 'gender', 'residence_area', 'housing_type',
+            'pet_allowed', 'indoors_agreement', 'absence_time',
+            'home_frequency',
+            'cat_experience', 'cat_distance', 'home_atmosphere',
+            'visitor_frequency', 'moving_plan'
+        ]
 
 class UserPrivateSerializer(serializers.ModelSerializer):
     """ユーザー詳細シリアライザー（管理者・本人・保護団体用）
@@ -19,13 +33,15 @@ class UserPrivateSerializer(serializers.ModelSerializer):
     """
     
     shelter_role = serializers.SerializerMethodField()
+    shelter_info = serializers.SerializerMethodField()
+    applicant_profile = ApplicantProfileSerializer(read_only=True)
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'user_type', 'phone_number',
             'address', 'profile_image', 'bio', 'created_at',
-            'shelter_role'
+            'shelter_role', 'shelter_info', 'is_superuser', 'applicant_profile'
         ]
         # GET用として安全性を確保（万が一更新に使われても重要項目は不可）
         read_only_fields = ['id', 'username', 'email', 'user_type', 'created_at']
@@ -39,6 +55,20 @@ class UserPrivateSerializer(serializers.ModelSerializer):
             return shelter_user.role
         return None
 
+    def get_shelter_info(self, obj):
+        if obj.user_type != 'shelter':
+            return None
+            
+        shelter_user = ShelterUser.objects.filter(user=obj, is_active=True).first()
+        if shelter_user:
+            return {
+                'id': shelter_user.shelter.id,
+                'name': shelter_user.shelter.name,
+                'verification_status': shelter_user.shelter.verification_status,
+                'review_message': shelter_user.shelter.review_message,
+            }
+        return None
+
 
 class UserMeUpdateSerializer(serializers.ModelSerializer):
     """ユーザー本人によるプロフィール更新用シリアライザー
@@ -47,14 +77,32 @@ class UserMeUpdateSerializer(serializers.ModelSerializer):
     - user_type, email, username などの重要フィールドを含めない（またはread_only）。
     - ユーザーが任意に変更して良いフィールドのみを許可する。
     """
+    applicant_profile = ApplicantProfileSerializer(required=False)
+
     class Meta:
         model = User
         fields = [
             'id', 'phone_number', 'address', 'profile_image', 'bio', 
             # 以下のフィールドは表示のみ（更新不可）
-            'username', 'email', 'user_type'
+            'username', 'email', 'user_type',
+            'applicant_profile'
         ]
         read_only_fields = ['id', 'username', 'email', 'user_type']
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('applicant_profile', None)
+        
+        # User情報の更新
+        instance = super().update(instance, validated_data)
+        
+        # Profileの更新
+        if profile_data is not None and instance.user_type == 'adopter':
+            profile, created = ApplicantProfile.objects.get_or_create(user=instance)
+            for attr, value in profile_data.items():
+                setattr(profile, attr, value)
+            profile.save()
+            
+        return instance
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -125,6 +173,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 phone_number=validated_data.get('phone_number', ''),
                 address=validated_data.get('address', '')
             )
+            # プロフィールも空で作成しておく
+            ApplicantProfile.objects.create(user=user)
             return user
         except IntegrityError:
             raise serializers.ValidationError("ユーザー登録中にエラーが発生しました。")

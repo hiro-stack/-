@@ -26,9 +26,12 @@ class MessageInline(admin.TabularInline):
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ['cat', 'applicant', 'shelter', 'full_name', 'status', 'applied_at']
-    list_filter = ['status', 'applied_at', 'has_experience']
-    search_fields = ['full_name', 'applicant__username', 'cat__name']
+    # full_name を削除
+    list_display = ['cat', 'applicant', 'shelter', 'status', 'applied_at']
+    # has_experience を削除
+    list_filter = ['status', 'applied_at']
+    # full_name を削除
+    search_fields = ['applicant__username', 'cat__name']
     inlines = [ApplicationEventInline, MessageInline]
     readonly_fields = ['applied_at', 'updated_at']
     
@@ -36,20 +39,21 @@ class ApplicationAdmin(admin.ModelAdmin):
         ('基本情報', {
             'fields': ('cat', 'applicant', 'shelter', 'status', 'message')
         }),
-        ('応募者情報', {
-            'fields': ('full_name', 'age', 'occupation', 'phone_number', 'address')
-        }),
-        ('飼育環境', {
+        ('同意事項', {
             'fields': (
-                'housing_type', 'has_garden', 'family_members',
-                'has_other_pets', 'other_pets_description'
+                'term_agreement', 'lifelong_care_agreement', 
+                'spay_neuter_agreement', 'medical_cost_understanding',
+                'cafe_data_sharing_consent'
             )
         }),
-        ('飼育経験', {
-            'fields': ('has_experience', 'experience_description')
+        ('追加情報', {
+            'fields': (
+                'income_status', 'emergency_contact_available', 
+                'family_consent', 'allergy_status'
+            )
         }),
         ('その他', {
-            'fields': ('motivation', 'additional_notes', 'applied_at', 'updated_at')
+            'fields': ('applied_at', 'updated_at')
         }),
     )
     

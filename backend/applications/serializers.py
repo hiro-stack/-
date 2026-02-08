@@ -1,28 +1,56 @@
 from rest_framework import serializers
 from .models import Application, Message
-from cats.serializers import CatListSerializer
+from cats.serializers import CatListSerializer, ShelterInfoSerializer
 from accounts.serializers import UserPublicSerializer, UserPrivateSerializer
 
 
+class CatDetailForApplicationSerializer(CatListSerializer):
+    """応募詳細に含まれる猫・団体情報用シリアライザー"""
+    shelter = ShelterInfoSerializer(read_only=True)
+    
+    class Meta(CatListSerializer.Meta):
+        fields = CatListSerializer.Meta.fields + ['shelter']
+
 class ApplicationSerializer(serializers.ModelSerializer):
-    """応募シリアライザー（一覧・公開用）
+    """応募シリアライザー（一覧・公開用）"""
     
-    デフォルトでは個人情報（連絡先、詳細属性）を含まない。
-    主にリスト表示や、まだ詳細を見る権限がない状態での表示に使用。
-    """
-    
-    cat_detail = CatListSerializer(source='cat', read_only=True)
+    cat_detail = CatDetailForApplicationSerializer(source='cat', read_only=True)
     applicant_info = UserPublicSerializer(source='applicant', read_only=True)
+    unread_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Application
         fields = [
             'id', 'cat', 'cat_detail', 'applicant_info',
-            'status', 
-            # 個人情報フィールドは除外
-            'motivation', 'applied_at', 'updated_at'
+            'status', 'unread_count',
+            'message', 'applied_at', 'updated_at'
         ]
         read_only_fields = ['id', 'applied_at', 'updated_at']
+
+    def get_unread_count(self, obj):
+        user = self.context.get('request').user if self.context.get('request') else None
+        if not user or not user.is_authenticated:
+            return 0
+            
+        # 自分が応募者の場合：団体または管理者からの未読を出す
+        if obj.applicant_id == user.id:
+            return obj.messages.filter(read_at__isnull=True).exclude(sender_type='user').count()
+            
+        # 自分が団体スタッフの場合：ユーザーからの未読を出す
+        # 注意: N+1問題の懸念があるため、本番環境では prefetch_related や 
+        # queryset.annotate(unread_count=...) の検討が必要。
+        # 今回は小規模想定で実装。
+        from shelters.models import ShelterUser
+        is_shelter_member = ShelterUser.objects.filter(
+            user=user,
+            shelter_id=obj.shelter_id,
+            is_active=True
+        ).exists()
+        
+        if is_shelter_member:
+            return obj.messages.filter(read_at__isnull=True).filter(sender_type='user').count()
+            
+        return 0
 
 
 class BaseApplicationDetailSerializer(ApplicationSerializer):
@@ -30,10 +58,10 @@ class BaseApplicationDetailSerializer(ApplicationSerializer):
     
     class Meta(ApplicationSerializer.Meta):
         fields = ApplicationSerializer.Meta.fields + [
-            'full_name', 'age', 'occupation', 'phone_number',
-            'address', 'housing_type', 'has_garden', 'family_members',
-            'has_other_pets', 'other_pets_description', 'has_experience',
-            'experience_description', 'additional_notes'
+            'term_agreement', 'lifelong_care_agreement', 'spay_neuter_agreement',
+            'medical_cost_understanding', 'income_status',
+            'emergency_contact_available', 'family_consent', 'allergy_status',
+            'cafe_data_sharing_consent'
         ]
 
 
@@ -50,7 +78,7 @@ class ApplicationDetailForShelterSerializer(BaseApplicationDetailSerializer):
     """保護団体用 応募詳細シリアライザー（連絡先開示版）
     
     保護団体が自団体の猫への応募を確認する際のみ使用する。
-    重要: applicant_info に UserPrivateSerializer を使用し、詳細な連絡先を開示する。
+    重要: applicant_info に UserPrivateSerializer を使用し、詳細な連絡先とプロフィールを開示する。
     """
     applicant_info = UserPrivateSerializer(source='applicant', read_only=True)
 
@@ -61,12 +89,24 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = [
-            'id', 'cat', 'full_name', 'age', 'occupation', 'phone_number',
-            'address', 'housing_type', 'has_garden', 'family_members',
-            'has_other_pets', 'other_pets_description', 'has_experience',
-            'experience_description', 'motivation', 'additional_notes'
+            'id', 'cat', 'message',
+            'term_agreement', 'lifelong_care_agreement', 'spay_neuter_agreement',
+            'medical_cost_understanding', 'income_status',
+            'emergency_contact_available', 'family_consent', 'allergy_status',
+            'cafe_data_sharing_consent'
         ]
         read_only_fields = ['id']
+    
+    def validate(self, attrs):
+        # 必須チェック（念のため）
+        if not attrs.get('term_agreement'):
+            raise serializers.ValidationError({"term_agreement": "利用規約への同意が必要です。"})
+        if not attrs.get('lifelong_care_agreement'):
+            raise serializers.ValidationError({"lifelong_care_agreement": "終生飼養への同意が必要です。"})
+        if not attrs.get('spay_neuter_agreement'):
+            raise serializers.ValidationError({"spay_neuter_agreement": "不妊去勢への同意が必要です。"})
+        
+        return attrs
 
 
 class ApplicationStatusUpdateSerializer(serializers.ModelSerializer):
@@ -116,7 +156,7 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
-            'id', 'application', 'application_id', 'sender', 'sender_info',
+            'id', 'application', 'application_id', 'sender', 'sender_type', 'sender_info',
             'content', 'created_at', 'is_read'
         ]
-        read_only_fields = ['id', 'application', 'sender', 'created_at']
+        read_only_fields = ['id', 'application', 'sender', 'sender_type', 'created_at']
