@@ -26,6 +26,32 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f'  ⚠ Could not download image: {e}'))
             return None
 
+    def download_placeholder_video(self, video_id=1):
+        """Download a small sample video file"""
+        try:
+            # Use a rotating list of small sample videos (< 1MB each)
+            # These are short, open-source sample videos
+            sample_videos = [
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+            ]
+
+            # Select a video based on video_id
+            url = sample_videos[video_id % len(sample_videos)]
+
+            self.stdout.write(f'  Downloading video from {url[:50]}...')
+            response = urllib.request.urlopen(url, timeout=30)
+            content = response.read()
+            self.stdout.write(f'  Downloaded {len(content) / 1024:.1f} KB')
+
+            return ContentFile(content, name=f'cat_video_{video_id}.mp4')
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'  ⚠ Could not download video: {e}'))
+            return None
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting test data creation...'))
 
@@ -231,20 +257,15 @@ class Command(BaseCommand):
                         )
                         self.stdout.write(f'  📷 Image {img_idx + 1} added')
 
-                # Add 1-2 videos (using placeholder image as video thumbnail for demo)
+                # Add 1-2 videos (actual video files)
                 num_videos = random.randint(0, 2)
                 for vid_idx in range(num_videos):
-                    # Note: We're using placeholder images as "video" files for demo purposes
-                    # In production, these would be actual video files
-                    video_file = self.download_placeholder_image(
-                        width=1280,
-                        height=720,
-                        cat_id=(i * 10 + vid_idx + 100)
+                    # Download actual sample video file
+                    video_file = self.download_placeholder_video(
+                        video_id=(i * 10 + vid_idx)
                     )
 
                     if video_file:
-                        # Rename to .mp4 to simulate video file
-                        video_file.name = video_file.name.replace('.jpg', '.mp4')
                         CatVideo.objects.create(
                             cat=cat,
                             video=video_file,
