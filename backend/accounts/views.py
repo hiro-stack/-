@@ -9,7 +9,7 @@ from .serializers import (
     UserMeUpdateSerializer
 )
 from shelters.serializers import ShelterRegistrationSerializer
-
+import os
 
 User = get_user_model()
 
@@ -142,8 +142,10 @@ class PasswordResetRequestView(APIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
 
         # メール送信
-        # TODO: フロントエンドURLを環境変数から取得するように変更推奨
-        reset_link = f"http://localhost:3000/reset-password/{uid}/{token}" 
+        # フロントエンドURLを環境変数から取得
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        reset_link = f"{frontend_url}/reset-password/{uid}/{token}"
+        
         subject = "【保護猫マッチング】パスワードリセット"
         message = f"""
 パスワードリセットのリクエストを受け付けました。
