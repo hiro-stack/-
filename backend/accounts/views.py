@@ -61,6 +61,7 @@ class ShelterRegistrationView(generics.CreateAPIView):
             shelter_user = ShelterUser.objects.filter(user=user).select_related('shelter').first()
             shelter_name = shelter_user.shelter.name if shelter_user and shelter_user.shelter else '（団体名不明）'
             
+            admin_frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
             subject = '【保護猫マッチング】新規団体登録がありました'
             message = f"""
 新規の保護団体登録がありました。
@@ -69,7 +70,7 @@ class ShelterRegistrationView(generics.CreateAPIView):
 団体名: {shelter_name}
 登録ユーザー: {user.username} ({user.email})
 
-審査管理画面: http://localhost:3000/admin/shelters
+審査管理画面: {admin_frontend_url}/admin/shelters
             """
             from_email = 'system@example.com'
             recipient_list = ['zhanghiromo@gmail.com']
