@@ -541,11 +541,12 @@ export default function ShelterApplicationDetailPage() {
                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                       {application.status === 'reviewing' && (
                         <button
+                          type="button"
                           onClick={() => handleUpdateStatus('trial')}
                           disabled={isUpdatingStatus}
-                          className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full hover:bg-purple-100 transition-all text-xs font-bold"
+                          className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 bg-purple-100 text-purple-800 border border-purple-200 rounded-full hover:bg-purple-200 transition-all text-sm font-bold shadow-sm active:scale-95"
                         >
-                          <Clock className="w-3.5 h-3.5" />
+                          <Clock className="w-4 h-4" />
                           トライアルに移行
                         </button>
                       )}
