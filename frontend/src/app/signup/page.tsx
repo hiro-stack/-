@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Cookies from "js-cookie";
-import api from "@/lib/api";
+import axios from "axios";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import { 
@@ -123,7 +123,13 @@ export default function SignupPage() {
 
     try {
       const endpoint = isShelterFlow ? "/api/accounts/register/shelter/" : "/api/accounts/register/";
-      const response = await api.post(endpoint, formData);
+      
+      // 新規登録APIには認証トークンを付けずにリクエストを送る
+      // （既にログイン済みの場合、無効なトークンが付与されて401エラーになる問題を防ぐ）
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${API_URL}${endpoint}`, formData, {
+        headers: { 'Content-Type': 'application/json' },
+      });
       const { tokens } = response.data;
 
       const isSecure = process.env.NODE_ENV === "production";
@@ -137,7 +143,7 @@ export default function SignupPage() {
         router.push("/profile/edit");
       }
     } catch (err: any) {
-      console.error("Signup error detail:", err.response?.data);
+      console.error("Signup error detail:", err.response?.data || err.message);
       if (err.response?.data) {
         const data = err.response.data;
         const fieldErrors: Record<string, string> = {};
@@ -149,6 +155,14 @@ export default function SignupPage() {
           else if (typeof val === "string") fieldErrors[key] = val;
           else if (typeof val === "object") fieldErrors[key] = JSON.stringify(val);
         });
+
+        // 全エラーを結合して general メッセージとしても表示する
+        const allErrorMessages = Object.entries(fieldErrors)
+          .map(([key, msg]) => `${msg}`)
+          .join('、');
+        if (allErrorMessages) {
+          fieldErrors.general = `入力内容にエラーがあります: ${allErrorMessages}`;
+        }
 
         setErrors(fieldErrors);
 
@@ -162,8 +176,12 @@ export default function SignupPage() {
             setCurrentStep(3);
           }
         }
+
+        // エラーメッセージが見えるようにスクロール
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         setErrors({ general: "サーバーとの通信に失敗しました。ネットワーク状況を確認してください。" });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } finally {
       setIsLoading(false);
