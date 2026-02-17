@@ -224,7 +224,16 @@ class CatImageUploadView(generics.CreateAPIView):
         # serializerにデータを渡す際、catはsave時に渡すのでここではrequest.dataのみ
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(cat=cat)
+        
+        try:
+            serializer.save(cat=cat)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'画像の保存に失敗しました: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

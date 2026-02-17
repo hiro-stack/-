@@ -184,8 +184,29 @@ export default function NewCatPage() {
           router.push(`/shelter/cats/`);
         } catch (imageErr: any) {
           console.error("Image upload failed:", imageErr);
-          // 猫の登録は成功したが、画像アップロードに失敗
-          const errorMsg = imageErr.response?.data?.error || imageErr.response?.data?.image?.[0] || "画像のアップロードに失敗しました";
+          // エラーメッセージの詳細化
+          let errorMsg = "画像のアップロードに失敗しました";
+          
+          if (imageErr.response) {
+            const status = imageErr.response.status;
+            const data = imageErr.response.data;
+            
+            if (data?.detail) {
+              errorMsg = `(${status}) ${data.detail}`;
+            } else if (data?.error) {
+              errorMsg = `(${status}) ${data.error}`;
+            } else if (data?.image && Array.isArray(data.image)) {
+              errorMsg = `(${status}) ${data.image.join(", ")}`;
+            } else if (typeof data === 'string') {
+              // HTMLエラー等が返ってきた場合
+              errorMsg = `(${status}) サーバーエラー: ${data.substring(0, 100)}...`;
+            } else {
+              errorMsg = `(${status}) 不明なエラーが発生しました`;
+            }
+          } else if (imageErr.message) {
+             errorMsg = imageErr.message;
+          }
+
           alert(`猫の登録は完了しましたが、画像のアップロードに失敗しました。\nエラー: ${errorMsg}\n\n編集ページから画像を追加してください。`);
           router.push(`/shelter/cats/${catId}/edit?created=true`);
         }
