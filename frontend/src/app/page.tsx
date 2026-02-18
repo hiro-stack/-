@@ -30,7 +30,7 @@ export default function Home() {
   const totalCount = data?.count || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#fef9f3] via-[#ffeef3] to-[#f5f0f6] font-sans text-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-[#fef9f3] via-[#ffeef3] to-[#f5f0f6] text-gray-900">
       <Header />
       
       <main className="pt-16">
@@ -171,7 +171,7 @@ export default function Home() {
       {/* Floating Help Button */}
       <button className="fixed bottom-8 right-8 w-16 h-16 bg-white text-pink-500 rounded-[2rem] shadow-2xl flex flex-col items-center justify-center hover:bg-pink-50 hover:scale-105 active:scale-95 transition-all border border-pink-100 z-50 group">
         <HelpCircle className="w-6 h-6 mb-0.5 group-hover:rotate-12 transition-transform" />
-        <span className="text-[10px] font-black uppercase tracking-tighter">Help</span>
+        <span className="text-[10px] font-bold uppercase tracking-tighter">Help</span>
       </button>
     </div>
   );

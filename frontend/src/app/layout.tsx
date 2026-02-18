@@ -1,9 +1,12 @@
-import { Inter } from "next/font/google";
+import { Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 
 import { Toaster } from "react-hot-toast";
 
-const inter = Inter({ subsets: ["latin"] });
+const zenMaruGothic = Zen_Maru_Gothic({
+  weight: ["300", "400", "500", "700", "900"],
+  subsets: ["latin"],
+});
 
 export const metadata = {
   title: "保護猫マッチング - 新しい家族との出会い",
@@ -16,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="ja">
+      <body className={zenMaruGothic.className}>
         {children}
         <Toaster
           position="top-center"

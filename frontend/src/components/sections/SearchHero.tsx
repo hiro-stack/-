@@ -12,11 +12,11 @@ const SearchHero: FC = () => {
         <div className="max-w-3xl mx-auto text-center space-y-6">
           
           
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-900 leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-800 leading-tight tracking-tight">
             保護猫と<span className="text-pink-500">新しい人生</span>を、<br className="sm:hidden" />ここからはじめる
           </h1>
           
-          <p className="text-lg text-gray-500 font-medium max-w-xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 font-medium max-w-xl mx-auto leading-relaxed">
             あなたとの出会いを待っている猫たちがたくさんいます。<br className="hidden sm:block" />
             ライフスタイルにぴったりのパートナーを見つけましょう。
           </p>

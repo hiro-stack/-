@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, MapPin, Phone, Mail, Play, Image as ImageIcon, ExternalLink, Calendar, Clock, Heart, Activity, Stethoscope, Twitter, AlertCircle, PawPrint, Lightbulb, Home, Sparkles, CheckCircle2, Handshake } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Play, Image as ImageIcon, ExternalLink, Calendar, Clock, Heart, Activity, Stethoscope, Twitter, AlertCircle, PawPrint, Lightbulb, Home, Sparkles, CheckCircle2, Handshake, ChevronRight } from "lucide-react";
 import { catsService } from "@/services/cats";
 import { CatDetail, CatImage, CatVideo } from "@/types";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
@@ -380,13 +380,14 @@ export default function CatDetailPage() {
             {/* カフェの基本情報 (スマホ版で上部に持ってくるデザインもアリだが、一旦ここに配置) */}
             <div 
                 onClick={() => router.push(`/shelters/${cat.shelter.id}`)}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-pink-100 transition-all cursor-pointer group/card"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-pink-200 hover:-translate-y-1 transition-all cursor-pointer group/card"
             >
-                 <h2 className="text-lg font-black text-gray-800 mb-6 flex items-center gap-3">
-                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center shadow-sm">
+                 <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-3">
+                   <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center shadow-sm group-hover/card:bg-indigo-100 group-hover/card:scale-110 transition-all">
                      <Home className="w-6 h-6" />
                    </div>
-                   お問い合わせ・譲渡元
+                   <span>お問い合わせ・譲渡元</span>
+                   <ChevronRight className="w-5 h-5 ml-auto text-gray-300 group-hover/card:text-pink-500 group-hover/card:translate-x-1 transition-all" />
                  </h2>
                  <div className="space-y-6">
                       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">

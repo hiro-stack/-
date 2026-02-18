@@ -101,7 +101,7 @@ const Header: FC = () => {
             <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-pink-100 group-hover:scale-110 transition-transform duration-300 ring-2 ring-white">
               <Cat className="w-6 h-6" />
             </div>
-            <span className="font-black text-xl tracking-tight text-gray-800">
+            <span className="font-bold text-xl tracking-tight text-gray-800">
               お迎え<span className="text-pink-500">マッチ</span>
             </span>
           </Link>

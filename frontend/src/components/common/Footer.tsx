@@ -13,7 +13,7 @@ const Footer: FC = () => {
               <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white border border-white/20">
                 <Cat className="w-6 h-6" />
               </div>
-              <span className="text-xl font-black tracking-tight">お迎え<span className="text-pink-300">マッチ</span></span>
+              <span className="text-xl font-bold tracking-tight">お迎え<span className="text-pink-300">マッチ</span></span>
             </div>
             <p className="text-[#e8d5f2] text-sm">
               保護猫との出会いをサポートするプラットフォームです。

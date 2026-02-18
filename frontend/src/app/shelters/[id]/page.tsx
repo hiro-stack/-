@@ -148,7 +148,6 @@ export default function ShelterPublicProfilePage() {
           <div className="lg:col-span-2 space-y-8">
             <section className="bg-white rounded-[2rem] p-8 sm:p-10 shadow-sm border border-gray-100">
               <h2 className="text-2xl font-black text-gray-900 mb-8 flex items-center gap-3">
-                <span className="p-2 bg-pink-100 text-pink-600 rounded-2xl">🐱</span>
                 保護中の猫たち 🐾
               </h2>
               
