@@ -385,7 +385,7 @@ ${staffName}`;
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-              {application.status === 'pending' && (
+              {application.status === 'pending' && currentUser?.shelter_role !== 'staff' && (
                 <button
                   onClick={() => handleUpdateStatus('reviewing')}
                   disabled={isUpdatingStatus}
@@ -399,7 +399,7 @@ ${staffName}`;
                   {isUpdatingStatus ? '処理中...' : '対応を開始（チャットを有効化）'}
                 </button>
               )}
-              {application.status === 'reviewing' && (
+              {application.status === 'reviewing' && currentUser?.shelter_role !== 'staff' && (
                 <button
                   onClick={() => handleUpdateStatus('trial')}
                   disabled={isUpdatingStatus}
@@ -413,7 +413,7 @@ ${staffName}`;
                   {isUpdatingStatus ? '処理中...' : 'トライアル開始'}
                 </button>
               )}
-              {application.status === 'trial' && (
+              {application.status === 'trial' && currentUser?.shelter_role !== 'staff' && (
                 <button
                   onClick={() => handleUpdateStatus('accepted')}
                   disabled={isUpdatingStatus}
@@ -427,7 +427,7 @@ ${staffName}`;
                   {isUpdatingStatus ? '処理中...' : '譲渡を確定（完了）'}
                 </button>
               )}
-              {(['pending', 'reviewing', 'trial'].includes(application.status)) && (
+              {(['pending', 'reviewing', 'trial'].includes(application.status)) && currentUser?.shelter_role !== 'staff' && (
                 <button
                   onClick={() => handleUpdateStatus('rejected')}
                   disabled={isUpdatingStatus}
@@ -641,21 +641,27 @@ ${staffName}`;
             {/* Chat Input */}
             <div className="bg-white border-t border-gray-200 p-4">
               {application.status === 'pending' ? (
-                <div className="bg-orange-50 rounded-xl p-4 text-center border border-orange-100">
-                   <p className="text-sm text-orange-800 font-bold mb-3">まずは「対応を開始」してチャットを有効にしましょう</p>
-                   <button
-                     onClick={() => handleUpdateStatus('reviewing')}
-                     className="px-6 py-2 bg-orange-500 text-white rounded-full text-sm font-bold shadow-md hover:bg-orange-600 transition-all"
-                   >
-                     対応を開始して会話をはじめる
-                   </button>
-                </div>
+                 <div className="bg-orange-50 rounded-xl p-4 text-center border border-orange-100">
+                    <p className="text-sm text-orange-800 font-bold mb-3">
+                      {currentUser?.shelter_role === 'staff' 
+                        ? '対応待機中です（管理者が対応を開始するとチャットが可能になります）' 
+                        : 'まずは「対応を開始」してチャットを有効にしましょう'}
+                    </p>
+                    {currentUser?.shelter_role !== 'staff' && (
+                      <button
+                        onClick={() => handleUpdateStatus('reviewing')}
+                        className="px-6 py-2 bg-orange-500 text-white rounded-full text-sm font-bold shadow-md hover:bg-orange-600 transition-all"
+                      >
+                        対応を開始して会話をはじめる
+                      </button>
+                    )}
+                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* ステータス変更クイックアクション */}
                   {['reviewing', 'trial'].includes(application.status) && (
                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-                      {application.status === 'reviewing' && (
+                      {application.status === 'reviewing' && currentUser?.shelter_role !== 'staff' && (
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('trial')}
@@ -666,7 +672,7 @@ ${staffName}`;
                           トライアルに移行
                         </button>
                       )}
-                      {application.status === 'trial' && (
+                      {application.status === 'trial' && currentUser?.shelter_role !== 'staff' && (
                         <button
                           onClick={() => handleUpdateStatus('accepted')}
                           disabled={isUpdatingStatus}
@@ -676,14 +682,16 @@ ${staffName}`;
                           譲渡を確定させる
                         </button>
                       )}
-                      <button
-                        onClick={() => handleUpdateStatus('rejected')}
-                        disabled={isUpdatingStatus}
-                        className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 transition-all text-xs font-bold"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        お断り（お見送り）
-                      </button>
+                      {currentUser?.shelter_role !== 'staff' && (
+                        <button
+                          onClick={() => handleUpdateStatus('rejected')}
+                          disabled={isUpdatingStatus}
+                          className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 transition-all text-xs font-bold"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          お断り（お見送り）
+                        </button>
+                      )}
                       <div className="h-4 w-px bg-gray-200 mx-1" />
                       {currentUser?.shelter_role !== 'staff' && (
                         <button
