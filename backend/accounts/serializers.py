@@ -139,12 +139,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password_confirm = serializers.CharField(write_only=True)
     # emailは必須入力とする
     email = serializers.EmailField(required=True)
+    residence_area = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = User
         fields = [
             'username', 'email', 'password', 'password_confirm',
-            'phone_number', 'address'
+            'phone_number', 'address', 'residence_area'
         ]
     
     def validate_username(self, value):
@@ -178,8 +179,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 phone_number=validated_data.get('phone_number', ''),
                 address=validated_data.get('address', '')
             )
-            # プロフィールも空で作成しておく
-            ApplicantProfile.objects.create(user=user)
+            # プロフィールも作成し、居住エリアを保存
+            ApplicantProfile.objects.create(
+                user=user,
+                residence_area=validated_data.get('residence_area', '')
+            )
             return user
         except IntegrityError:
             raise serializers.ValidationError("ユーザー登録中にエラーが発生しました。")

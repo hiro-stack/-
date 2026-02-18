@@ -25,11 +25,6 @@ const Footer: FC = () => {
             <h3 className="font-semibold mb-4">リンク</h3>
             <ul className="space-y-2 text-sm text-[#e8d5f2]">
               <li>
-                <Link href="/cats" className="hover:text-white transition-colors">
-                  保護猫を探す
-                </Link>
-              </li>
-              <li>
                 <Link href="/about" className="hover:text-white transition-colors">
                   サービスについて
                 </Link>

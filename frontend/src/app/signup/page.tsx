@@ -314,12 +314,12 @@ export default function SignupPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">パスワード</label>
-                        <input type="password" name="password" value={formData.password} onChange={handleChange} className={`w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-pink-300 outline-none transition-all ${errors.password ? "ring-2 ring-red-300" : ""}`} placeholder="8文字以上" />
+                        <input type="password" name="password" value={formData.password} onChange={handleChange} className={`w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-pink-300 outline-none transition-all ${errors.password ? "ring-2 ring-red-300" : ""}`} placeholder="8文字以上でパスワードを入力してください" />
                         {errors.password && <p className="mt-2 text-xs text-red-500 font-medium">{errors.password}</p>}
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">確認用</label>
-                        <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} className={`w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-pink-300 outline-none transition-all ${errors.password_confirm ? "ring-2 ring-red-300" : ""}`} placeholder="再度入力" />
+                        <input type="password" name="password_confirm" value={formData.password_confirm} onChange={handleChange} className={`w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-pink-300 outline-none transition-all ${errors.password_confirm ? "ring-2 ring-red-300" : ""}`} placeholder="再度パスワードを入力してください" />
                         {errors.password_confirm && <p className="mt-2 text-xs text-red-500 font-medium">{errors.password_confirm}</p>}
                       </div>
                     </div>
