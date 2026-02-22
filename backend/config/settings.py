@@ -23,10 +23,6 @@ HEROKU_APP_NAME = os.environ.get('HEROKU_APP_NAME')
 if HEROKU_APP_NAME:
     ALLOWED_HOSTS.append(f'{HEROKU_APP_NAME}.herokuapp.com')
 
-# Add Render hostname if present
-RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
-if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Application definition
 INSTALLED_APPS = [

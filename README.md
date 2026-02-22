@@ -1,5 +1,8 @@
 # 保護猫マッチングシステム - セットアップガイド
 
+##公開しているURL
+https://cat-maching.vercel.app/
+
 ## 🚀 クイックスタート
 
 ### 1. 前提条件
@@ -178,12 +181,12 @@ docker compose exec frontend npm install
 3. `frontend`ディレクトリをルートに設定
 4. 環境変数を設定
 
-### Render（バックエンド）
+### Heroku（バックエンド）
 
-1. Renderアカウントを作成
-2. Web Serviceを作成
-3. Dockerfileを使用してデプロイ
-4. 環境変数を設定
+1. Herokuアカウントを作成
+2. Herokuアプリを作成（Heroku Postgresアドオンを追加）
+3. GitHubリポジトリを接続、またはHeroku CLIでデプロイ
+4. 環境変数を設定（Procfileを使用）
 
 ## 📄 ライセンス
 
