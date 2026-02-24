@@ -56,6 +56,17 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_user_type_display()})"
 
+    def delete(self, *args, **kwargs):
+        """物理削除を防ぎ、論理削除（is_active=False）に差し替える。
+        管理者の意図的な物理削除のみを許可するオプション付き。
+        """
+        force = kwargs.pop('force', False)
+        if force:
+            super().delete(*args, **kwargs)
+        else:
+            self.is_active = False
+            self.save()
+
 
 class ApplicantProfile(models.Model):
     """応募者（里親希望者）プロフィール"""

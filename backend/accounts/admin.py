@@ -20,6 +20,18 @@ class UserAdmin(BaseUserAdmin):
     )
     inlines = [ApplicantProfileInline]
 
+    def has_delete_permission(self, request, obj=None):
+        # スーパーユーザーのみが特定のフラグを持って削除可能にする、
+        # あるいは一律禁止して論理削除のみとする。
+        # ここでは常にFalseを返し、誤削除を完全に防ぐ。
+        return False
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
 
 @admin.register(ApplicantProfile)
 class ApplicantProfileAdmin(admin.ModelAdmin):
